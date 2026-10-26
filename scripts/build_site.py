@@ -5,7 +5,7 @@ from pathlib import Path
 
 from src.espn_client import EspnError, fetch, fetch_snapshot
 from src.report import projected_season_fppg
-from src.weekly import (EASTERN, INACTIVE_STATUSES, current_week, entries_for_day,
+from src.weekly import (EASTERN, SEASON_DAY_ONE, current_week, entries_for_day,
                         evaluate_add_drops, lineup_alert, nba_day, normalize_entry,
                         point_value, scoring_period)
 
@@ -189,7 +189,7 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch, snapshot_fetc
         player_info[str(player["id"])] = {k: v for k, v in player.items() if k != "lineup_slot_id"}
 
     # Include current-week ESPN histories where ESPN explicitly returns daily actuals.
-    history = _history(__import__("src.weekly", fromlist=["SEASON_DAY_ONE"]).SEASON_DAY_ONE,
+    history = _history(SEASON_DAY_ONE,
                        today, player_info)
     return {
         "schema_version": 2,
@@ -203,6 +203,8 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch, snapshot_fetc
         "matchups": output_matchups,
         "team_analysis": week_team,
         "daily_lineups": daily,
+        "nba_schedule": {d: {str(k): v for k, v in team_games.items()}
+                         for d, team_games in nba_schedule.items()},
         "players": player_info,
         "history": history,
         "opportunities": opportunities,
