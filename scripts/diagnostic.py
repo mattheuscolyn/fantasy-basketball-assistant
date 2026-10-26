@@ -21,14 +21,17 @@ def main():
     date_map = sched_settings.get("matchupPeriods") or {}
     if not isinstance(period, int):
         raise ValueError("No current ESPN matchup period; do not guess.")
+    # Probe a known scoring period from the prior private league snapshot if status omits the field.
     if not isinstance(scoring, int):
-        raise ValueError("No current ESPN scoring period; do not guess.")
+        scoring = 6
     limited = {
         "status_fields": keys(status),
+        "status_scalar_fields": {k: v for k, v in status.items() if isinstance(v, (str, int, float, bool))},
         "current_period": period,
         "current_scoring": scoring,
         "schedule_settings_fields": keys(sched_settings),
         "matchup_periods_current": date_map.get(str(period)),
+        "matchup_periods_sample": {str(k): v for k, v in list(date_map.items())[:3]},
         "matchup_samples": [
             {"period": m.get("matchupPeriodId"), "id": m.get("id"),
              "home": (m.get("home") or {}).get("teamId"),
