@@ -39,6 +39,51 @@ def actual_season_fppg(entry, season=2027):
     return None
 
 
+def projected_season_fppg(entry, season=2027):
+    """Explicit ESPN season-long fantasy projection (stat source 1), not a model output."""
+    player = player_data(entry)
+    pool = entry.get("playerPoolEntry") or {}
+    stats = player.get("stats") or pool.get("stats") or []
+    for stat in stats:
+        if (
+            stat.get("seasonId") == season
+            and stat.get("scoringPeriodId") == 0
+            and stat.get("statSourceId", stat.get("statTypeId")) == 1
+            and stat.get("statSplitTypeId", 0) == 0
+            and isinstance(stat.get("appliedAverage"), (int, float))
+        ):
+            return float(stat["appliedAverage"])
+    return None
+
+
+def projection_audit(entries, weights, season=2027):
+    """Verify that ESPN's projected raw statistic totals reproduce fantasy totals."""
+    present = 0
+    checked = 0
+    failures = []
+    for entry in entries:
+        info = player_data(entry)
+        pool = entry.get("playerPoolEntry") or {}
+        for stat in info.get("stats") or pool.get("stats") or []:
+            if not (stat.get("seasonId") == season
+                    and stat.get("scoringPeriodId") == 0
+                    and stat.get("statSourceId", stat.get("statTypeId")) == 1
+                    and stat.get("statSplitTypeId", 0) == 0):
+                continue
+            present += 1
+            raw = stat.get("stats")
+            total = stat.get("appliedTotal")
+            if not isinstance(raw, dict) or not isinstance(total, (int, float)):
+                failures.append(info.get("fullName", "Unknown"))
+                break
+            calculated = calculate_points(raw, weights)
+            checked += 1
+            if abs(calculated - float(total)) > 0.05:
+                failures.append(info.get("fullName", "Unknown"))
+            break
+    return present, checked, failures
+
+
 def scoring_weights(settings):
     weights = {}
     items = (settings.get("scoringSettings") or {}).get("scoringItems") or []
@@ -87,6 +132,39 @@ def render(snapshot):
     overrides = [str(item.get("statId")) for item in scoring.get("scoringItems", []) if item.get("pointsOverrides")]
     if overrides:
         result += ["", "**Warning:** ESPN returned scoring overrides for statistic IDs " + ", ".join(overrides) + ". Base scoring weights alone may not cover these exceptions."]
+    entries = [entry for team in teams for entry in (team.get("roster") or {}).get("entries") or []] + agents
+    projection_count, projection_checked, projection_failures = projection_audit(entries, weights)
+    result += [
+        "",
+        "## Projection scoring validation",
+        "ESPN's full-season projections are **baselines**, not verified short-term forecasts.",
+        "Players with a projected season stat record: " + str(projection_count) + " / " + str(len(entries)) + "  ",
+        "Projected total fantasy scores recomputed from your scoring weights: " + str(projection_checked) + "  ",
+        "Mismatched player projections: " + str(len(projection_failures)),
+    ]
+    if projection_failures:
+        result.append("Mismatches: " + ", ".join(safe(x) for x in projection_failures[:10]))
+    result += [
+        "",
+        "## Healthy available players by ESPN projected FP/G",
+        "This is a **projection baseline**, not a roster-specific add/drop recommendation. It does not include the NBA schedule.",
+        "| Player | ESPN projected FP/G | Actual season FP/G | Injury/status |",
+        "|---|---:|---:|---|",
+    ]
+    healthy = [
+        a for a in agents
+        if player_data(a).get("injuryStatus") in ("ACTIVE", "NORMAL", "HEALTHY", None)
+        and projected_season_fppg(a) is not None
+    ]
+    for agent in sorted(healthy, key=lambda a: projected_season_fppg(a), reverse=True)[:20]:
+        p = player_data(agent)
+        forecast = projected_season_fppg(agent)
+        actual = actual_season_fppg(agent)
+        result.append("| " + safe(p.get("fullName")) + " | " + format(forecast, ".1f") +
+                      " | " + (format(actual, ".1f") if actual is not None else "—") +
+                      " | " + safe(p.get("injuryStatus", "Unknown")) + " |")
+    if not healthy:
+        result.append("| No healthy projections returned | — | — | — |")
     result += ["", "## Current team rosters", "Lineup slot IDs are left as ESPN returns them; position labels will be validated separately."]
     for team in sorted(teams, key=lambda t: t.get("id", 0)):
         roster = (team.get("roster") or {}).get("entries") or []
@@ -129,6 +207,8 @@ def render(snapshot):
         "Every team has at least one roster entry": all(bool((t.get("roster") or {}).get("entries")) for t in teams),
         "Scoring rules present": bool(weights),
         "Player pool present": bool(agents),
+        "Every player has an ESPN full-season projection": projection_count == len(entries),
+        "Every projection agrees with fantasy scoring weights": projection_checked == len(entries) and not projection_failures,
     }
     result += ["", "## Data-quality checks"]
     for check, passed in checks.items():
