@@ -1,0 +1,76 @@
+name: Build Courtside dashboard
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 15,20,1 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/build_site.py'
+      - 'src/weekly.py'
+      - 'site/**'
+      - '.github/workflows/build-dashboard.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      ESPN_S2: ${{ secrets.ESPN_S2 }}
+      ESPN_SWID: ${{ secrets.ESPN_SWID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test scoring and optimizer
+        run: python -m unittest discover -s tests -v
+      - name: Build read-only dashboard data
+        run: python -m scripts.build_site
+      - name: Check published JSON for prohibited fields
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          data = Path('site/data.json').read_text()
+          payload = json.loads(data)
+          assert payload['schema_version'] == 2
+          assert len(payload['teams']) == 7
+          assert len(payload['matchups']) >= 3
+          for forbidden in ('espn_s2', 'ESPN_S2', 'SWID', 'owners', 'email', 'cookie', 'memberId', 'member_id'):
+              assert forbidden not in data, 'Prohibited field in public payload: ' + forbidden
+          print('Publication schema and sensitive-field checks passed')
+          PY
+      - name: Upload private site preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: courtside-site-preview
+          path: site/
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && vars.ENABLE_PUBLIC_PAGES == 'true'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download sanitized site
+        uses: actions/download-artifact@v4
+        with:
+          name: courtside-site-preview
+          path: site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+      - id: deployment
+        uses: actions/deploy-pages@v4
