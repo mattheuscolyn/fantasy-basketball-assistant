@@ -20,14 +20,20 @@ class NoRedirect(HTTPRedirectHandler):
         raise EspnError("Unexpected ESPN redirect; credentials were not forwarded.")
 
 
-def fetch(views, *, player_filter=None):
+def fetch(views, *, player_filter=None, scoring_period=None, matchup_period=None):
     s2, swid = os.getenv("ESPN_S2"), os.getenv("ESPN_SWID")
     if not s2 or not swid:
         raise EspnError("Missing ESPN_S2 or ESPN_SWID repository secret.")
     if not (swid.startswith("{") and swid.endswith("}")):
         raise EspnError("ESPN_SWID must include its surrounding curly braces.")
     base = f"{HOST}/apis/v3/games/fba/seasons/{SEASON}/segments/0/leagues/{LEAGUE_ID}"
-    query = urlencode([("view", view) for view in views])
+    parameters = [("view", view) for view in views]
+    for label, value in (("scoringPeriodId", scoring_period), ("matchupPeriodId", matchup_period)):
+        if value is not None:
+            if not isinstance(value, int) or value < 1 or value > 365:
+                raise EspnError("Invalid ESPN scoring or matchup period.")
+            parameters.append((label, value))
+    query = urlencode(parameters)
     headers = {
         "Accept": "application/json",
         "User-Agent": "fantasy-basketball-assistant/0.1",
