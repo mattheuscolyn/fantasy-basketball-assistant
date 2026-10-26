@@ -16,9 +16,9 @@ This is an ingestion audit, **not** yet a projection model or an add/drop recomm
 ## First run
 
 1. In the repository, visit **Settings → Secrets and variables → Actions**.
-2. Add repository secret \`ESPN_S2\` with your complete ESPN \`espn_s2\` browser cookie.
-3. Add repository secret \`ESPN_SWID\` with your complete ESPN \`SWID\` browser cookie (including the surrounding curly braces).
-4. Visit **Actions → ESPN private league read-only sync → Run workflow** on branch \`main\`.
+2. Add repository secret `ESPN_S2` with your complete ESPN `espn_s2` browser cookie.
+3. Add repository secret `ESPN_SWID` with your complete ESPN `SWID` browser cookie (including the surrounding curly braces).
+4. Visit **Actions → ESPN private league read-only sync → Run workflow** on branch `main`.
 5. Open the completed run and read the **Summary**. A failed data-quality check will mark the workflow as unsuccessful.
 
 Session cookies grant access to your ESPN account. Never paste them into chat, a commit, an issue, or logs. If they expire, replace the two secrets with fresh values. If they leak, sign out of ESPN sessions / rotate credentials.
@@ -29,11 +29,11 @@ The connection uses ESPN's unofficial API. ESPN can modify or block its endpoint
 
 Python 3.12 and its standard library are enough:
 
-\`\`\`bash
+```bash
 python -m unittest discover -s tests -v
 # If credentials are already in the local environment:
 python -m scripts.sync
-\`\`\`
+```
 
 The workflow output is restricted to viewers of this private repository, but still includes league members' rosters and should be treated as private. The program does not commit or upload snapshots to source control.
 
