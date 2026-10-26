@@ -44,6 +44,21 @@ def main():
         pro_shapes={"kind":type(pro_sched).__name__}
 
     day=fetch(["mRoster"],scoring_period=scoring)
+    old=fetch(["mRoster"],scoring_period=6)
+    def roster_stat_probe(record):
+        teams=record.get("teams") or []
+        out=[]
+        for t in teams[:1]:
+            for e in ((t.get("roster") or {}).get("entries") or [])[:3]:
+                player=(e.get("playerPoolEntry") or {}).get("player") or {}
+                stats=player.get("stats") or (e.get("playerPoolEntry") or {}).get("stats") or []
+                out.append({"player_id":player.get("id"),
+                            "stat_probes":[{"period":s.get("scoringPeriodId"),
+                                            "split":s.get("statSplitTypeId"),
+                                            "source":s.get("statSourceId"),
+                                            "points":s.get("appliedTotal")}for s in stats[:12]]})
+        return out
+
     samples=box.get("schedule") or []
     out={
        "pro_schedule_keys":list(pro.keys()),
@@ -65,6 +80,7 @@ def main():
                       "home":side_shape(m.get("home") or {}),"away":side_shape(m.get("away") or {})}
                      for m in samples[:4]],
        "day_team_count":len(day.get("teams") or []),
+       "daily_stat_probe":roster_stat_probe(old),
        "day_sample":[{"id":t.get("id"),"entries":[{"id":e.get("playerId"),
                 "slot":e.get("lineupSlotId")}for e in (t.get("roster")or{}).get("entries",[])][:20]}
                     for t in (day.get("teams")or[])[:2]],
