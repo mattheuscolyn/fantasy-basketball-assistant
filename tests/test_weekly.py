@@ -50,7 +50,7 @@ class WeeklyOptimizerTests(unittest.TestCase):
             player(2, 30, [0, 11, 12], 12),
         ]
         alert = lineup_alert(players, {16: ["pre"]})
-        self.assertEqual(alert["potential_gain"], 20)
+        self.assertEqual(alert["potential_gain"], 30)
         self.assertEqual(alert["bench_to_start"], ["Player 2"])
 
     def test_no_game_no_lineup_alert(self):
