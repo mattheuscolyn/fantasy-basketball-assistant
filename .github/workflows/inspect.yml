@@ -1,0 +1,26 @@
+name: Inspect league data shapes
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - scripts/inspect_live.py
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ESPN_S2: ${{ secrets.ESPN_S2 }}
+      ESPN_SWID: ${{ secrets.ESPN_SWID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m scripts.inspect_live
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-schema-inspection
+          path: reports/inspect.json
+          retention-days: 1
