@@ -50,59 +50,47 @@ def _daily_actual(entry, period):
     return float(chosen["appliedTotal"])
 
 
-def _history(today, metadata, *, espn_fetch=fetch):
-    """Query ESPN player cards for actual games regardless of fantasy roster.
+def _history(league_start, today, espn_fetch):
+    """Historical game-level actuals from ESPN's day-scoped team roster feed.
 
-    Game records must have statSourceId=0 and statSplitTypeId=5.
-    No zero-filled missed-game records or fabricated projected history.
+    Query each historical scoring day, keeping ONLY stat-source 0 / split 5
+    for that exact day. Missing records stay missing (not zero).
     """
-    ids = sorted(int(pid) for pid in metadata if str(pid).isdigit())
-    result = {}
-    latest = scoring_period(today)
-    # Small batches keep ESPN JSON responses under safety limit.
-    for offset in range(0, len(ids), 20):
-        subset = ids[offset:offset + 20]
-        response = espn_fetch(["kona_playercard"], player_filter={
-            "players": {
-                "filterIds": {"value": subset},
-                "filterStatsForTopScoringPeriodIds": {
-                    "value": 75,
-                    "additionalValue": ["002027", "102027"],
-                },
-            },
-        })
-        players = response.get("players")
-        if not isinstance(players, list):
-            raise ValueError("ESPN game-card history data is malformed.")
-        for entry in players:
-            p = entry.get("player") or {}
-            pid = p.get("id") or entry.get("id")
-            if pid is None:
-                continue
-            observations = {}
-            for record in p.get("stats") or []:
-                if (record.get("seasonId") != 2027
-                        or record.get("statSourceId") != 0
-                        or record.get("statSplitTypeId") != 5):
+    first = max(1, scoring_period(today) - HISTORY_DAYS)
+    last = scoring_period(today) - 1
+    history = {}
+    for period_id in range(first, last + 1):
+        day = league_start + timedelta(days=period_id - 1)
+        # The 2026 season began Tuesday October 20. Week 1 was six days;
+        # subsequent fantasy weeks follow Monday through Sunday.
+        try:
+            response = espn_fetch(["mRoster"], scoring_period=period_id)
+        except EspnError:
+            continue
+        for team in response.get("teams") or []:
+            for entry in (team.get("roster") or {}).get("entries") or []:
+                pool = entry.get("playerPoolEntry") or {}
+                player = pool.get("player") or {}
+                pid = player.get("id") or entry.get("playerId")
+                if pid is None:
                     continue
-                period = record.get("scoringPeriodId")
-                actual = record.get("appliedTotal")
-                if (not isinstance(period, int) or period < 1 or period >= latest
-                        or not isinstance(actual, (int, float))):
-                    continue
-                raw = record.get("stats") or {}
-                # ESPN may retain a zero-point record on a day a player did not
-                # appear. Game appearances are recorded in stat ID 42.
-                if "42" in raw and float(raw["42"]) <= 0:
-                    continue
-                event_date = SEASON_DAY_ONE + timedelta(days=period - 1)
-                observations[event_date.isoformat()] = float(actual)
-            if observations:
-                result[str(pid)] = [
-                    {"date": day, "actual": value}
-                    for day, value in sorted(observations.items())[-40:]
+                game_records = [
+                    s for s in (player.get("stats") or pool.get("stats") or [])
+                    if s.get("seasonId") == 2027
+                    and s.get("scoringPeriodId") == period_id
+                    and s.get("statSourceId") == 0
+                    and s.get("statSplitTypeId") == 5
+                    and isinstance(s.get("appliedTotal"), (int, float))
                 ]
-    return result
+                if not game_records:
+                    continue
+                # Keep the game only once per player/day, even across multiple rosters.
+                history.setdefault(str(pid), {})[day.isoformat()] = float(game_records[0]["appliedTotal"])
+    return {
+        pid: [{"date": when, "actual": actual}
+              for when, actual in sorted(record.items())]
+        for pid, record in history.items()
+    }
 
 
 def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch, snapshot_fetch=fetch_snapshot):
@@ -146,7 +134,7 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch, snapshot_fetc
             continue
         response = espn_fetch(["mBoxscore"], scoring_period=scoring_period(day),
                               matchup_period=period)
-        rosters = entries_for_day(response)
+        rosters = entries_for_day(response, period)
         if set(rosters) != set(teams):
             raise ValueError("Incomplete daily ESPN rosters for " + key
                              + "; refusing to publish fabricated lineups.")
@@ -227,7 +215,7 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch, snapshot_fetc
             "waivers_not_modeled": True,
             "streaming_requires_manual_review": True,
             "season_projection_baseline": "ESPN full-season projected FP/G",
-            "historical_expected_baseline": "Current projection; not historical as-of-game",
+            "historical_expected_baseline": "Current ESPN projection only; historical as-of snapshots not collected yet",
             "today_in_progress_games": "Live games excluded from remaining projections",
             "free_agents_checked": len(free_agents),
         },
