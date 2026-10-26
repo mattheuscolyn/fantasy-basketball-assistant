@@ -32,9 +32,22 @@ def main():
     if not isinstance(current,int):current=2
     if not isinstance(scoring,int):scoring=6
     box=fetch(["mBoxscore"],scoring_period=scoring,matchup_period=current)
+    pro=fetch(["proTeamSchedules_wl"])
+    pro_sched=pro.get("proTeamSchedules")
+    if isinstance(pro_sched,dict):
+        pro_shapes={str(k): {"kind":type(v).__name__, "keys":list(v.keys())[:15] if isinstance(v,dict) else [],
+                             "sample":str(v)[:250] } for k,v in list(pro_sched.items())[:2]}
+    elif isinstance(pro_sched,list):
+        pro_shapes={"items":[{"keys":list(v.keys()) if isinstance(v,dict) else [],
+                              "sample":str(v)[:250]}for v in pro_sched[:3]]}
+    else:
+        pro_shapes={"kind":type(pro_sched).__name__}
+
     day=fetch(["mRoster"],scoring_period=scoring)
     samples=box.get("schedule") or []
     out={
+       "pro_schedule_keys":list(pro.keys()),
+       "pro_schedule_shape":pro_shapes,
        "status_keys":list(status.keys()),
        "status_safe":{k:v for k,v in status.items() if k in (
            "currentMatchupPeriod","currentScoringPeriod","latestScoringPeriod",
