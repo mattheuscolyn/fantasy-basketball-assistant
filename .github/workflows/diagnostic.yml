@@ -1,0 +1,25 @@
+name: One-time ESPN schema diagnostic
+on:
+  push:
+    branches: [main]
+    paths: ['scripts/diagnostic.py', '.github/workflows/diagnostic.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ESPN_S2: ${{ secrets.ESPN_S2 }}
+      ESPN_SWID: ${{ secrets.ESPN_SWID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m scripts.diagnostic
+      - uses: actions/upload-artifact@v4
+        with:
+          name: safe-schema-diagnostic
+          path: reports/schema-diagnostic.json
+          retention-days: 1
