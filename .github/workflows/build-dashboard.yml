@@ -9,6 +9,7 @@ on:
       - 'scripts/build_site.py'
       - 'src/weekly.py'
       - 'site/**'
+      - 'tests/**'
       - '.github/workflows/build-dashboard.yml'
 
 permissions:
