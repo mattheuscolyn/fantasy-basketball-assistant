@@ -21,3 +21,10 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Fetch ESPN data and write private summary
         run: python -m scripts.sync
+      - name: Upload private allowlisted league snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: espn-private-league-snapshot
+          path: reports/private-league-snapshot.json
+          retention-days: 1
+          if-no-files-found: error
