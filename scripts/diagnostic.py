@@ -75,6 +75,31 @@ def main():
                                      "sample_matchup_fields": keys(match), "sides": sides})
         except Exception as error:
             limited["daily"].append({"day": day, "error_class": type(error).__name__})
+    # Probe player cards for verified game-by-game fantasy scoring history.
+    try:
+        cards = fetch(["kona_playercard"], player_filter={
+            "players": {
+                "filterIds": {"value": [3112335, 4431678]},
+                "filterStatsForTopScoringPeriodIds": {
+                    "value": 35, "additionalValue": ["002027", "102027"]
+                },
+            }
+        })
+        rows = cards.get("players") or []
+        limited["player_card_probe"] = {
+            "player_count": len(rows),
+            "outer_keys": keys(rows[0]) if rows else [],
+            "stat_records": [{
+                "source": v.get("statSourceId"),
+                "split": v.get("statSplitTypeId"),
+                "period": v.get("scoringPeriodId"),
+                "season": v.get("seasonId"),
+                "applied_total": v.get("appliedTotal")
+            } for v in (((rows[0].get("player") or {}).get("stats") or [])[:45])]
+            if rows else [],
+        }
+    except Exception as error:
+        limited["player_card_probe"] = {"error_class": type(error).__name__}
     Path("reports").mkdir(exist_ok=True)
     Path("reports/schema-diagnostic.json").write_text(json.dumps(limited, indent=2))
 
