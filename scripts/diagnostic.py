@@ -79,7 +79,7 @@ def main():
     try:
         cards = fetch(["kona_playercard"], player_filter={
             "players": {
-                "filterIds": {"value": [3112335, 4431678]},
+                "filterIds": {"value": [1966, 3112335]},
                 "filterStatsForTopScoringPeriodIds": {
                     "value": 35, "additionalValue": ["002027", "102027"]
                 },
@@ -94,7 +94,10 @@ def main():
                 "split": v.get("statSplitTypeId"),
                 "period": v.get("scoringPeriodId"),
                 "season": v.get("seasonId"),
-                "applied_total": v.get("appliedTotal")
+                "applied_total": v.get("appliedTotal"),
+                "appearances_41": (v.get("stats") or {}).get("41"),
+                "appearances_42": (v.get("stats") or {}).get("42"),
+                "minutes_28": (v.get("stats") or {}).get("28")
             } for v in (((rows[0].get("player") or {}).get("stats") or [])[:45])]
             if rows else [],
         }
