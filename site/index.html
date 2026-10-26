@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101924">
+  <meta name="description" content="Read-only fantasy basketball matchup forecasts, lineup opportunities, and player performance trends.">
+  <title>Fantasy Basketball Assistant</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="shell topbar">
+      <div class="brand"><span class="brand-icon">◈</span><div><strong>COURTSIDE</strong><small>Fantasy Assistant</small></div></div>
+      <div class="update" id="update">Loading league…</div>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="hero">
+      <span class="eyebrow">ESPN · HEAD-TO-HEAD POINTS · 2026–27</span>
+      <h1>Make every game count.</h1>
+      <p>Understand every matchup, spot lineup mistakes, and see who's beating expectations.</p>
+    </section>
+    <nav class="tabs" aria-label="Dashboard sections">
+      <button class="tab active" data-view="league">League</button>
+      <button class="tab" data-view="lineups">Lineups</button>
+      <button class="tab" data-view="trends">Trends</button>
+      <button class="tab" data-view="moves">Opportunities</button>
+    </nav>
+    <div id="message" class="message" hidden></div>
+    <section id="content" aria-live="polite">
+      <div class="empty">Loading this week's data…</div>
+    </section>
+  </main>
+  <footer class="footer shell">Read-only analysis · Unofficial ESPN integration · Transactions always made in ESPN · <a href="https://fantasy.espn.com/basketball/" rel="noopener noreferrer" target="_blank">Open ESPN Fantasy</a></footer>
+  <script src="app.js" defer></script>
+</body>
+</html>
