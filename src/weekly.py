@@ -90,10 +90,12 @@ def normalize_entry(entry):
     }
 
 
-def entries_for_day(league_response):
+def entries_for_day(league_response, matchup_period):
     """Use ESPN's daily roster, never extrapolate one current roster to all days."""
     result = {}
     for matchup in league_response.get("schedule") or []:
+        if matchup.get("matchupPeriodId") != matchup_period:
+            continue
         for label in ("home", "away"):
             side = matchup.get(label)
             if not isinstance(side, dict) or not isinstance(side.get("teamId"), int):
