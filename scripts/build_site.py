@@ -192,7 +192,7 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch, snapshot_fetc
         player_info[str(player["id"])] = {k: v for k, v in player.items() if k != "lineup_slot_id"}
 
     # Include current-week ESPN histories where ESPN explicitly returns daily actuals.
-    history = _history(today, player_info, espn_fetch=espn_fetch)
+    history = _history(SEASON_DAY_ONE, today, espn_fetch)
     return {
         "schema_version": 2,
         "generated_at_utc": datetime.utcnow().isoformat() + "Z",
