@@ -24,6 +24,16 @@ function render(){
   if(view==="moves")renderMoves();
 }
 function renderLeague(){
+  const liveTeams=Object.values(DATA.nba_schedule||{}).flatMap(byDay=>Object.values(byDay||{})).flat().filter(state=>state==="in").length;
+  if(liveTeams>0){
+    const notice=el("div","alert");
+    const detail=el("div","stack");
+    add(detail,
+      el("strong","","Live-game projections are temporarily incomplete"),
+      el("span","hint","NBA games are in progress, but ESPN may not yet have added their scores to matchup totals. These estimates currently exclude points from games already underway. Treat the projected winner and margin as provisional until the scores update."));
+    add(notice,el("span","warning","⚠"),detail);
+    section.append(notice);
+  }
   const top=el("div","stat-cards");
   const matches=DATA.matchups.filter(m=>!m.bye);
   const your=matches.find(m=>String(m.home_team_id)===String(DATA.my_team_id)||String(m.away_team_id)===String(DATA.my_team_id));
