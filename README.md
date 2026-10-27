@@ -62,7 +62,7 @@ To enable Pages on this repository if eligible:
 - Remaining points are based on **the daily lineup currently saved in ESPN**, not on a hypothetical team of the best ten players.
 - A game counts only if its NBA schedule state is **pre-game** and the player is not marked out/inactive. Live games aren't forecast further until a more accurate live-remaining method is available.
 - Optimized points use a ten-slot eligible lineup (including three UTIL positions) each day; current projected total and optimized projected total are shown separately.
-- Add/drop scenarios assume the new player is immediately available for **future days only**, and don't model waivers, acquisition caps, injury changes, games-played caps, or the risk of losing a dropped player. Treat as ideas requiring manual review, not orders.
+- Add/drop scenarios account for the ESPN **seven-acquisition matchup cap**, completed acquisitions, free-agent versus waiver status, and a conservative waiver-processing availability date. They intentionally do not predict waiver priority, acquisition success, intra-day clearance, injury changes, or the risk of permanently losing dropped players. Treat them as advisory estimates.
 - The trends page compares historical actual scoring against the **latest** ESPN season projection, not historical predictions saved before each game. DNP/zero-filled ESPN records are excluded unless a games-played flag confirms participation.
 
 ## Data reliability and security
@@ -86,7 +86,7 @@ Core calculations have deterministic unit tests. Scheduled builds also validate 
 
 **Live matchup estimate:** The dashboard credits ESPN's `totalPointsLive` (falling back to `totalPoints`). When NBA games are already underway, it estimates only the unplayed fraction of regulation time using ESPN projected FP/G, without adding another full-game projection. That extra amount is an approximation, not a prediction from actual pace. Missing NBA clock data suppress affected projections. Started lineup positions are locked in the optimizer.
 
-**Acquisition policy:** The league's ESPN settings specify `matchupLimitPerScoringPeriod=true` and `matchupAcquisitionLimit=1`, which scale the **matchup-wide acquisition cap** by the number of scoring periods (usually **seven acquisitions across a seven-day matchup**). They do **not** mean one acquisition per day. Verified ESPN transaction history shows several completed additions in a single scoring period. There is no season-long acquisition cap. Traditional waivers have a 24-hour period, and ESPN controls their processing times; free agents can be added immediately. The dashboard now counts actual executed `ADD` transactions for each team in the current matchup and shows remaining acquisitions, plus pending requests. Move suggestions still require checking a player's current clearance time and lineups in ESPN.
+**Acquisition policy:** The league's ESPN settings specify `matchupLimitPerScoringPeriod=true` and `matchupAcquisitionLimit=1`, which scale the **matchup-wide acquisition cap** by the number of scoring periods (usually **seven acquisitions across a seven-day matchup**). They do **not** mean one acquisition per day. Verified ESPN transaction history shows several completed additions in a single scoring period. There is no season-long acquisition cap. Traditional waivers have a 24-hour period, and ESPN controls their processing times; free agents can be added immediately. The dashboard now counts actual executed `ADD` transactions for each team in the current matchup and shows remaining acquisitions, plus pending requests. ESPN also provides `FREEAGENT`/`WAIVERS` status and a process timestamp for waiver players. The simulation waits until the day *after* a waiver clears before crediting games, to avoid promising intra-day availability. Claim success still depends on waiver priority, and you should verify moves in ESPN.
 
 **Point-in-time trends:** Every successful scheduled dashboard build records a timestamped, allowlisted snapshot to the `projection-history` branch. Records contain only numeric per-player projections, ESPN NBA team IDs, and public NBA game tipoff times. The trend chart compares actual points to the **latest observed ESPN projection saved strictly before that game's tipoff**. When historical observations don't exist (including games before tracking started), the pregame expected value stays blank. We do not substitute a current projection for an older one.
 
@@ -96,7 +96,7 @@ Scheduled builds are serialized, so they don't overwrite each other's archive re
 
 ## Next improvements
 
-- Validate individual player waiver availability and exact processing time to improve executable move recommendations.
+- Improve exact intra-day eligibility and player/game lock checks for newly processed waivers; compare prospective forecasts with outcomes.
 - Expand and paginate free-agent coverage beyond the initial 150-player ESPN request.
 - Preserve **point-in-time projection snapshots** for prospective trend analysis.
 - Add lineup-lock awareness, postgame forecast calibration and personalized protected-player preferences.
