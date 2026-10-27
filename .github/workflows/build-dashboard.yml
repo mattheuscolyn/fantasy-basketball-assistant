@@ -8,6 +8,8 @@ on:
     paths:
       - 'scripts/build_site.py'
       - 'src/weekly.py'
+      - 'src/espn_client.py'
+      - 'src/report.py'
       - 'site/**'
       - 'tests/**'
       - '.github/workflows/build-dashboard.yml'
@@ -54,7 +56,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: github.event_name == 'workflow_dispatch' && vars.ENABLE_PUBLIC_PAGES == 'true'
+    if: vars.ENABLE_PUBLIC_PAGES == 'true'
     needs: build
     runs-on: ubuntu-latest
     permissions:
