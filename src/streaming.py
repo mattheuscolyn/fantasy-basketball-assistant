@@ -61,7 +61,10 @@ def streaming_options(daily_lineups, nba_schedule, free_agents, today,
                 new.append(dict(added, lineup_slot_id=12))
                 projected = sum(best_lineup(new, games)[0]
                                 for games in future_schedule.values())
-                future_cost[(str(dropped["id"]), str(added["id"]))] = round(projected - base, 1)
+                future_cost[(str(dropped["id"]), str(added["id"]))] = (
+                    None if dropped.get("injury_status") in
+                    (INACTIVE_STATUSES | {"DAY_TO_DAY", "QUESTIONABLE"})
+                    else round(projected - base, 1))
 
     options = []
     for dropped in drop_pool:
@@ -117,15 +120,15 @@ def streaming_options(daily_lineups, nba_schedule, free_agents, today,
             "Assumes free agents stay available, acquired before each listed "
             "day's games; verify processing and lock times in ESPN.")
     options.sort(key=lambda o: (o["ranking_score"], o["this_week_gain"]), reverse=True)
-    # Limit risk of floods of similar permutations.
-    distinct = set()
+    # Preserve alternative original roster drops and at least one single-move
+    # option per player. Otherwise every displayed scenario can sacrifice the
+    # same injured-but-valuable player.
     result = []
-    for item in options:
-        key = (str(item["drop_id"]), tuple(str(m["add_id"]) for m in item["moves"]))
-        if key in distinct:
-            continue
-        distinct.add(key)
-        result.append(item)
-        if len(result) >= 30:
-            break
-    return result
+    for dropped in drop_pool:
+        group = [p for p in options if p["drop_id"] == dropped["id"]]
+        singles = [p for p in group if p["acquisitions"] == 1]
+        selected = group[:5]
+        if singles and all(p["acquisitions"] == 2 for p in selected):
+            selected.append(singles[0])
+        result.extend(selected)
+    return sorted(result, key=lambda p: p["ranking_score"], reverse=True)
