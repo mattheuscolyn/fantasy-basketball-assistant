@@ -291,6 +291,7 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
         "teams": list(teams.values()),
         "matchups": output_matchups,
         "team_analysis": week_team,
+        "transaction_rules": rules,
         "live_scoring": {
             "source": "ESPN totalPointsLive, falling back to totalPoints",
             "in_progress_nba_games": sum(
