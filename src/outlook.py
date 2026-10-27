@@ -131,12 +131,19 @@ def evaluate_season_signal(weeks, team_id, observed=None):
                    if next_opp is not None else None)
     # No calibrated win probability or arbitrary luck score.
     # A large deficit cannot by itself justify a costly irreversible drop.
+    own_rank = own.get("league_rank")
+    opp_rank = opponent.get("league_rank")
     if not enough:
         decision = "Review data"
         reason = "The current matchup projection is incomplete."
     elif margin >= 0:
         decision = "Protect the lead"
         reason = "You are projected ahead; focus on free lineup fixes."
+    elif own_rank is not None and own_rank <= 3 and opp_rank == 1:
+        decision = "Preserve the roster"
+        reason = ("Your team ranks among the league's top three projected scorers "
+                  "this week but faces the highest-scoring opponent. That is "
+                  "a tough matchup, not proof your roster is weak.")
     elif margin < -100 and (next_margin is None or next_margin > margin):
         decision = "Preserve the roster"
         reason = "A large projected deficit makes risky short-term drops unattractive."
@@ -156,6 +163,7 @@ def evaluate_season_signal(weeks, team_id, observed=None):
         "next_week_margin": next_margin,
         "team_future_weekly_average": near_average,
         "opponent_id": opp_id, "next_opponent_id": next_opp,
+        "current_rank": own_rank, "opponent_current_rank": opp_rank,
         "observed_performance": performance,
         "caveats": ["Future weeks use current rosters, ESPN season projections and optimized eligibility.",
                     "NBA schedules, injuries and opponent rosters may change.",
