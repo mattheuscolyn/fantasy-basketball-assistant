@@ -84,8 +84,15 @@ def _history(league_start, today, espn_fetch):
                 ]
                 if not game_records:
                     continue
+                record = game_records[0]
+                box_stats = record.get("stats") or {}
+                minutes = box_stats.get("40", box_stats.get(40))
+                if record["appliedTotal"] == 0 and not (isinstance(minutes, (int, float)) and minutes > 0):
+                    # ESPN emits zero-point daily records even for DNPs.
+                    # Exclude them from per-game averages and trend charts.
+                    continue
                 # Keep the game only once per player/day, even across multiple rosters.
-                history.setdefault(str(pid), {})[day.isoformat()] = float(game_records[0]["appliedTotal"])
+                history.setdefault(str(pid), {})[day.isoformat()] = float(record["appliedTotal"])
     return {
         pid: [{"date": when, "actual": actual}
               for when, actual in sorted(record.items())]
