@@ -2,7 +2,7 @@
 
 No transaction APIs; comparisons are advisory.
 """
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
@@ -87,6 +87,11 @@ def normalize_entry(entry):
         "eligible_slots": p.get("eligibleSlots") or [],
         "injury_status": p.get("injuryStatus"),
         "projected_fppg": projected_season_fppg(entry),
+        "availability_status": entry.get("status") if entry.get("status") in ("FREEAGENT", "WAIVERS") else None,
+        "waiver_process_at_utc": (
+            datetime.fromtimestamp(entry["waiverProcessDate"] / 1000, timezone.utc).isoformat()
+            if isinstance(entry.get("waiverProcessDate"), (int, float))
+            and 0 < entry["waiverProcessDate"] < 10**14 else None),
     }
 
 
