@@ -28,7 +28,7 @@ class LiveAndArchiveTests(unittest.TestCase):
             "16": {"state": "in", "remaining_fraction": None}})
         self.assertEqual((missing, count), (None, 1))
 
-    def test_exact_daily_espn_transaction_rule(self):
+    def test_seven_acquisitions_total_not_one_per_day(self):
         s = {"acquisitionSettings": {
             "acquisitionType": "WAIVERS_TRADITIONAL",
             "matchupLimitPerScoringPeriod": True,
@@ -37,10 +37,11 @@ class LiveAndArchiveTests(unittest.TestCase):
             "acquisitionLimit": -1,
         }}
         policy = transaction_settings(s, days_in_matchup=7)
-        self.assertEqual(policy["per_scoring_period"], 1)
+        self.assertEqual(policy["per_scoring_period_multiplier"], 1)
+        self.assertTrue(policy["matchup_limit_scaled_by_days"])
         self.assertEqual(policy["maximum_matchup_additions"], 7)
         self.assertIsNone(policy["season_limit"])
-        self.assertFalse(policy["daily_usage_known"])
+        self.assertFalse(policy["usage_verified"])
 
     def test_only_projections_saved_before_tipoff_match(self):
         with tempfile.TemporaryDirectory() as tmp:
