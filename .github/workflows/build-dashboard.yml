@@ -15,7 +15,11 @@ on:
       - '.github/workflows/build-dashboard.yml'
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: courtside-build
+  cancel-in-progress: false
 
 jobs:
   build:
