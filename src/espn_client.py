@@ -84,7 +84,7 @@ def fetch_snapshot():
     free_agents = fetch(["kona_player_info"], player_filter={
         "players": {
             "filterStatus": {"value": ["FREEAGENT", "WAIVERS"]},
-            "limit": 50,
+            "limit": 150,
             "sortPercOwned": {"sortPriority": 1, "sortAsc": False},
         }
     }).get("players")
