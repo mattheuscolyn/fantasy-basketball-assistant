@@ -25,6 +25,131 @@ function render(){
   if(view==="trends")renderTrends();
   if(view==="moves")renderMoves();
 }
+function getProtectedPlayers(){
+  const days=Object.keys(DATA.daily_lineups||{}).sort();
+  const roster=(DATA.daily_lineups[days[0]]||{})[String(DATA.my_team_id)]||[];
+  const unique=[...new Map(roster.filter(p=>p.id!=null).map(p=>[String(p.id),p])).values()];
+  unique.sort((a,b)=>(b.projected_fppg||0)-(a.projected_fppg||0));
+  return unique;
+}
+function initProtect(){
+  if(!DATA)return;
+  const team=String(DATA.my_team_id);
+  try{
+    const saved=JSON.parse(localStorage.getItem("courtside-protected-"+team)||"null");
+    if(saved&&typeof saved==="object"&&!Array.isArray(saved)){protect=saved;return;}
+  }catch(e){}
+  protect={};
+  getProtectedPlayers().slice(0,8).forEach(p=>{protect[String(p.id)]=true});
+}
+function saveProtect(){
+  try{localStorage.setItem("courtside-protected-"+DATA.my_team_id,JSON.stringify(protect));}catch(e){}
+}
+function renderStrategy(){
+  const outlook=DATA.three_week_outlook||[];
+  const guidance=DATA.season_guidance||{};
+  section.append(heading("Season strategy","Your next three matchups, not just tonight's score"));
+  if(outlook.length!==3){
+    section.append(el("div","help","Three-week matchup data is not yet complete. The dashboard won't invent future opponents or schedules."));
+  }else{
+    const recap=panel(guidance.recommendation||"Review matchup",
+      "Schedule-based guidance · not a calibrated win probability");
+    recap.append(el("p","hint",guidance.reason||"Evaluate current and future lineups."));
+    const metrics=el("div","stat-cards");
+    add(metrics,numberText("This-week margin",guidance.current_margin),
+      numberText("Next-week margin",guidance.next_week_margin),
+      numberText("Avg. next 2 weeks",guidance.team_future_weekly_average));
+    recap.append(metrics);section.append(recap);
+    const grid=el("div","grid");
+    outlook.forEach((w,i)=>{
+      const tid=String(DATA.my_team_id);
+      const mine=w.teams?.[tid]||{};
+      const opponents=w.matchups||[];
+      const pair=opponents.find(m=>String(m.home_team_id)===tid||String(m.away_team_id)===tid);
+      const opponentId=pair?(String(pair.home_team_id)===tid?pair.away_team_id:pair.home_team_id):null;
+      const rival=opponentId===null?null:w.teams?.[String(opponentId)];
+      const card=panel(w.label,dateLabel(w.week_start));
+      add(card,el("div","team-name",opponentId===null?"Bye week":"vs. "+getTeam(opponentId).name));
+      const row=el("div","versus");
+      add(row,info(el("div"),"Your projection",fmt(mine.projected_points)),info(el("div"),"Opponent projection",rival?fmt(rival.projected_points):"—"));
+      card.append(row);
+      const rank=mine.league_rank?"Projected "+mine.league_rank+" of "+w.ranked_count+" teams":"Projection rank unavailable";
+      card.append(pill(rank));
+      if(i>0){
+        const p=el("p","hint","Usable starts: "+(mine.usable_starts??"—")+
+          " · Scheduled player-games: "+(mine.potential_player_games??"—")+
+          ". Relative to your next-two-week average: "+(mine.relative_to_own_future_average>0?"+":"")+
+          fmt(mine.relative_to_own_future_average)+" FP.");
+        card.append(p);
+      }else{
+        card.append(el("p","hint","Includes ESPN points earned plus remaining projected starts."));
+      }
+      grid.append(card);
+    });
+    section.append(grid);
+    const evidence=panel("Is your opponent getting lucky?","Separate performance variance from schedule strength");
+    const observations=DATA.performance_signals||{};
+    const own=observations[String(DATA.my_team_id)]||{};
+    const opponent=guidance.opponent_id!=null?observations[String(guidance.opponent_id)]||{}:{};
+    if((own.matched_games||0)<5||(opponent.matched_games||0)<5){
+      evidence.append(el("p","hint","Insufficient matched pregame projections to make a reliable performance-versus-expectation comparison. The archived projection series is still accumulating. A favorable schedule or high total alone does not establish luck."));
+    }else{
+      const margin=el("div","stat-cards");
+      add(margin,numberText("Your roster vs expectation",own.actual_minus_expected),
+        numberText("Opponent vs expectation",opponent.actual_minus_expected),
+        numberText("Matched opponent games",opponent.matched_games));
+      evidence.append(margin);
+      evidence.append(el("p","hint","Figures measure rostered players' game-level averages vs saved pregame projections, not just credited starter points; small samples may be noisy."));
+    }
+    section.append(evidence);
+  }
+  const prefs=panel("Protect your roster","Stored only on this device");
+  prefs.append(el("p","hint","Protected players are excluded from streaming-plan drop suggestions. Your eight highest-projected rostered players start protected; change these based on your preferences."));
+  const choices=el("div","protection-grid");
+  getProtectedPlayers().forEach(p=>{
+    const label=el("label","player-check"),check=el("input");
+    check.type="checkbox";check.checked=!!protect[String(p.id)];
+    check.addEventListener("change",()=>{protect[String(p.id)]=check.checked;saveProtect();render();});
+    const desc=el("span","",p.name+" · "+fmt(p.projected_fppg)+" FP/G");
+    add(label,check,desc);choices.append(label);
+  });
+  prefs.append(choices);section.append(prefs);
+  const plans=panel("Streaming scenarios","No roster changes made automatically");
+  const actions=el("div","controls");
+  const conservative=el("button","link-btn","Conservative");
+  const aggressive=el("button","link-btn","Aggressive");
+  conservative.setAttribute("aria-pressed",String(riskMode==="conservative"));
+  aggressive.setAttribute("aria-pressed",String(riskMode==="aggressive"));
+  conservative.onclick=()=>{riskMode="conservative";render();};
+  aggressive.onclick=()=>{riskMode="aggressive";render();};
+  add(actions,conservative,aggressive);plans.append(actions);
+  const all=DATA.streaming_plans||[];
+  const filtered=all.filter(p=>!protect[String(p.drop_id)]&&
+      (riskMode==="aggressive" || p.three_week_net_points===null||p.three_week_net_points>=0));
+  if(!filtered.length){
+    plans.append(el("div","empty","No eligible streaming plan passes the current player protection and risk settings. Holding your roster is a valid decision."));
+  }else{
+    filtered.slice(0,4).forEach((p,i)=>{
+      const item=el("div","plan-card");
+      const lead=el("div","row between");
+      add(lead,el("strong","",i===0?"Best eligible scenario":"Alternative scenario"),
+        pill(p.acquisitions+" acquisition"+(p.acquisitions===1?"":"s")));
+      item.append(lead);
+      const stats=el("div","stat-cards");
+      add(stats,numberText("This-week gain",p.this_week_gain),
+        numberText("Next 2 weeks",p.next_two_weeks_delta),
+        numberText("3-week net",p.three_week_net_points));
+      item.append(stats);
+      p.moves.forEach((m,j)=>{
+        item.append(el("p","hint",(j+1)+". "+dateLabel(m.day)+": Drop "+m.drop+" → Add "+m.add));
+      });
+      item.append(el("p","hint","Risk: "+p.risk+". "+p.availability_note));
+      plans.append(item);
+    });
+  }
+  plans.append(el("p","hint","Schedules and injury statuses can change. Plans assume listed free agents remain available and their acquisitions clear before the specified days. Three-week point differences are not calibrated win probabilities."));
+  section.append(plans);
+}
 function renderLeague(){
   const liveTeams=Object.values(DATA.nba_schedule||{}).flatMap(byDay=>Object.values(byDay||{})).flat().filter(state=>state==="in").length;
   if(liveTeams>0){
@@ -242,6 +367,7 @@ document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{vie
     const data=await response.json();
     if(data.schema_version!==2)throw new Error("Dashboard data version mismatch.");
     DATA=data;
+    initProtect();
     const d=new Date(data.generated_at_utc);
     document.getElementById("update").textContent="Updated "+d.toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit",timeZone:"America/Los_Angeles"})+" PT";
     render();
