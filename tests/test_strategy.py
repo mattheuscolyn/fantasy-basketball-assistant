@@ -29,7 +29,7 @@ class SeasonPlanningTests(unittest.TestCase):
         self.assertEqual(result[1]["teams"]["1"]["league_rank"], 1)
         self.assertEqual(matchup_for_team(result[2], 1), 2)
         signal = evaluate_season_signal(result, 1)
-        self.assertEqual(signal["recommendation"], "Consider safe streaming")
+        self.assertEqual(signal["recommendation"], "Preserve the roster")
         self.assertEqual(signal["observed_performance"]["status"], "Not enough evidence")
 
     def test_two_step_stream_can_fill_different_days(self):
