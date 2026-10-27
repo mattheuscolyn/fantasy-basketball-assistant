@@ -82,8 +82,26 @@ class WeeklyOptimizerTests(unittest.TestCase):
         tomorrow = "2026-10-27"
         roster = [player(1, 10, [0, 11, 12], 0)]
         agents = [player(2, 30, [0, 11, 12], 12)]
+        agents[0]["availability_status"] = "FREEAGENT"
         moves = evaluate_add_drops({tomorrow: roster}, {tomorrow: {16: ["pre"]}}, agents, today)
         self.assertEqual(moves[0]["projected_gain"], 20.0)
+
+    def test_waiver_candidate_not_usable_before_clearance(self):
+        today = date(2026, 10, 27)
+        wed = "2026-10-28"
+        thurs = "2026-10-29"
+        roster = [player(1, 10, [0, 11, 12], 0)]
+        addition = player(2, 50, [0, 11, 12], 12)
+        addition["availability_status"] = "WAIVERS"
+        addition["waiver_process_at_utc"] = "2026-10-28T07:00:00+00:00"
+        moves = evaluate_add_drops(
+            {wed: roster, thurs: roster},
+            {wed: {16: ["pre"]}, thurs: {16: ["pre"]}},
+            [addition], today)
+        self.assertEqual(moves[0]["first_usable_day"], thurs)
+        # Wed's roster vacancy loses 10 pts; Thursday earns 50.
+        # Current optimized baseline is 20; new total is 50.
+        self.assertEqual(moves[0]["projected_gain"], 30)
 
     def test_ir_is_excluded(self):
         players = [player(1, 70, [0, 11, 13], 13)]
