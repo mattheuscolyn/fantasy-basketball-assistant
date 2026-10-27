@@ -6,6 +6,7 @@ from src.transaction_rules import transaction_settings
 from src.transactions import transaction_counts
 from src.outlook import (matchups_for_period, forecast_future_week,
                          generate_outlook, evaluate_season_signal, matchup_for_team)
+from src.streaming import streaming_options
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -341,6 +342,16 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
         diagnostic = {"recommendation": "Future schedule unavailable",
                       "reason": "ESPN could not confirm the complete three-week outlook.",
                       "caveats": ["Current matchup forecasts are unaffected."]}
+    current_original_roster = [
+        normalize_entry(e) for e in
+        (next(t for t in snapshot["teams"] if t["id"] == MY_TEAM_ID)
+         .get("roster") or {}).get("entries") or []
+    ]
+    planned_streams = streaming_options(
+        next_days, nba_schedule, free_agents, today,
+        future_schedule=future_schedule if outlook else None,
+        current_roster=current_original_roster,
+        acquisition_remaining=remaining_moves)
     # Include current-week ESPN histories where ESPN explicitly returns daily actuals.
     history = _history(SEASON_DAY_ONE, today, espn_fetch, player_info)
     archive = os.getenv("COURTSIDE_HISTORY_DIR")
@@ -372,6 +383,7 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
         "teams": list(teams.values()),
         "three_week_outlook": outlook,
         "season_guidance": diagnostic,
+        "streaming_plans": planned_streams,
         "matchups": output_matchups,
         "team_analysis": week_team,
         "transaction_rules": rules,
