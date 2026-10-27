@@ -238,7 +238,12 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
                     and "in" in (nba_schedule[live_today].get(p.get("pro_team_id")) or [])
                     for p in daily[live_today][tid])
             else:
-                live_incomplete = value is None
+                expected_started = sum(
+                    1 for p in daily[live_today][tid]
+                    if p.get("lineup_slot_id") in (0, 1, 2, 3, 4, 5, 6, 11)
+                    and "in" in (nba_schedule[live_today].get(p.get("pro_team_id")) or [])
+                )
+                live_incomplete = value is None or started != expected_started
                 live_add = value or 0.0
         week_team[tid] = {
             "remaining_expected": round(baseline + live_add, 1),
