@@ -267,6 +267,7 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
                 pair["away_actual"] + week_team[away]["remaining_optimized"], 1)),
         })
 
+    rules = transaction_settings(snapshot["settings"], len(week))
     free_agents = [normalize_entry(a) for a in snapshot["free_agents"]]
     next_days = {d: daily[d][str(MY_TEAM_ID)] for d in daily}
     opportunities = evaluate_add_drops(next_days, nba_schedule, free_agents, today)
