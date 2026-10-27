@@ -58,6 +58,15 @@ jobs:
               assert forbidden not in data, 'Prohibited field in public payload: ' + forbidden
           print('Publication schema and sensitive-field checks passed')
           PY
+      - name: Save point-in-time projections
+        run: |
+          git -C projection-archive config user.name "courtside-bot"
+          git -C projection-archive config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C projection-archive add snapshots/
+          if ! git -C projection-archive diff --cached --quiet; then
+            git -C projection-archive commit -m "Record timestamped projections"
+            git -C projection-archive push origin HEAD:projection-history
+          fi
       - name: Upload private site preview
         uses: actions/upload-artifact@v4
         with:
