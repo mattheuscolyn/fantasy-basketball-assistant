@@ -179,11 +179,12 @@ function renderTrends(){
   });
   ranking.append(table);section.append(ranking);
 }
-function makeGraph(games,expected){
+function makeGraph(games){
+  const expected=games.map(g=>typeof g.expected_at_game==="number"?g.expected_at_game:null);
   const width=730,height=295,pad={l:44,r:18,t:24,b:44};
   const svg=svgPoint("svg",{viewBox:"0 0 "+width+" "+height,role:"img","aria-label":"Actual fantasy game points and three-game rolling averages versus current ESPN projection",class:"chart"});
   const actual=games.map(g=>g.actual),roll=games.map((g,i)=>i>=2?(g.actual+games[i-1].actual+games[i-2].actual)/3:null);
-  const max=Math.max(15,...actual,...roll.filter(Number.isFinite),expected||0)*1.15;
+  const max=Math.max(15,...actual,...roll.filter(Number.isFinite),...expected.filter(Number.isFinite))*1.15;
   const xx=i=>pad.l+(games.length<=1?.5:i/(games.length-1))*(width-pad.l-pad.r);
   const yy=v=>height-pad.b-v/max*(height-pad.t-pad.b);
   for(let tick=0;tick<=4;tick++){
@@ -192,15 +193,18 @@ function makeGraph(games,expected){
     const text=svgPoint("text",{x:pad.l-9,y:y+4,fill:"#91aaba","font-size":12,"text-anchor":"end"});
     text.textContent=String(Math.round(max*tick/4));svg.append(text);
   }
-  if(expected!==null){
-    const y=yy(expected);svg.append(svgPoint("line",{x1:pad.l,x2:width-pad.r,y1:y,y2:y,stroke:"#f0bd75","stroke-width":2,"stroke-dasharray":"7 5"}));
-  }
+
   const poly=(values,color)=>{
-    const points=values.map((v,i)=>v===null?null:[xx(i),yy(v)]).filter(Boolean);
-    if(points.length>=2)svg.append(svgPoint("polyline",{points:points.map(p=>p.join(",")).join(" "),fill:"none",stroke:color,"stroke-width":3,"stroke-linejoin":"round","stroke-linecap":"round"}));
-    points.forEach(([x,y])=>svg.append(svgPoint("circle",{cx:x,cy:y,r:2.8,fill:color})));
+    let segment=[];
+    const flush=()=>{if(segment.length>=2)svg.append(svgPoint("polyline",{points:segment.map(p=>p.join(",")).join(" "),fill:"none",stroke:color,"stroke-width":3,"stroke-linejoin":"round","stroke-linecap":"round"}));segment=[];};
+    values.forEach((v,i)=>{
+      if(!Number.isFinite(v)){flush();return;}
+      const x=xx(i),y=yy(v);segment.push([x,y]);
+      svg.append(svgPoint("circle",{cx:x,cy:y,r:3,fill:color}));
+    });
+    flush();
   };
-  poly(actual,"#7cd8c7");poly(roll,"#9e96ed");
+  poly(actual,"#7cd8c7");poly(roll,"#9e96ed");poly(expected,"#f0bd75");
   const indexes=[0,Math.floor((games.length-1)/2),games.length-1];
   [...new Set(indexes)].forEach(i=>{
     const t=svgPoint("text",{x:xx(i),y:height-16,fill:"#92acbb","font-size":12,"text-anchor":"middle"});
