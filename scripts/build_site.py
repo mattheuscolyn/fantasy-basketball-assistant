@@ -3,6 +3,7 @@ import json
 import os
 from src.projection_history import save_snapshot, load, attach_game_projections
 from src.transaction_rules import transaction_settings
+from src.transactions import transaction_counts
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -275,6 +276,18 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
         })
 
     rules = transaction_settings(snapshot["settings"], len(week))
+    try:
+        usage = transaction_counts(espn_fetch, week, today, [t["id"] for t in teams.values()])
+        rules.update(usage)
+        rules["usage_verified"] = True
+        cap = rules.get("maximum_matchup_additions")
+        rules["remaining_by_team"] = {
+            tid: max(0, cap - used) if isinstance(cap, int) else None
+            for tid, used in usage["executed_additions_by_team"].items()
+        }
+    except (ValueError, EspnError, TypeError):
+        rules["usage_verified"] = False
+        rules["remaining_by_team"] = {tid: None for tid in teams}
     free_agents = [normalize_entry(a) for a in snapshot["free_agents"]]
     next_days = {d: daily[d][str(MY_TEAM_ID)] for d in daily}
     opportunities = evaluate_add_drops(next_days, nba_schedule, free_agents, today)
