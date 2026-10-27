@@ -94,6 +94,18 @@ Scheduled builds are serialized, so they don't overwrite each other's archive re
 
 **Important:** The live remainder and future add/drop simulations remain estimates. We haven't incorporated per-player real-time scoring pace, verified same-day transaction usage, or detailed waiver-claim execution yet.
 
+## Strategy: three-week decision dashboard
+
+The **Strategy** tab is the default landing page. It compares this week's projected matchup with your next two actual ESPN opponents and their projected lineups. This week uses earned/live ESPN scores plus points from the saved daily lineup; future weeks use **current rosters optimally assigned to eligible daily slots**. No future acquisitions, injury returns, or lineup locks are assumed.
+
+A league-wide ranking shows whether your opponent is especially tough. The app treats observed player overperformance separately: it only compares actual results against **historically saved, pre-tipoff** ESPN projections and explicitly says when observations are insufficient. A tough schedule or projected league-leading opponent is **not** evidence of luck.
+
+The **Protected players** controls are saved in local browser storage only, never to ESPN or GitHub. By default the ten highest-projected rostered players plus any projected at least 35 FP/G are protected. Edit this list to reflect your own risk tolerance.
+
+The **Streaming scenarios** panel simulates one- and two-acquisition sequences across the remaining week using free agents, positional constraints and the verified matchup acquisition allowance. It also estimates the next two weeks' points if the final acquisition is retained; this value is hidden when an injured dropped player's recovery makes it unreliable. Conservative mode omits uncertain or negative three-week scenarios, and neither mode ever recommends dropping a protected player. Aggressive mode does not override a user's explicit protection.
+
+**Limitations:** This is a candidate generator, not a complete game-theoretic optimizer. It does not predict waiver competition, trades, future injuries, shifts in playing time, probability of winning, or future free-agent availability. Streamers are assumed acquired in time to play beginning on the indicated following day. A move must be carried out manually in ESPN.
+
 ## Next improvements
 
 - Improve exact intra-day eligibility and player/game lock checks for newly processed waivers; compare prospective forecasts with outcomes.
