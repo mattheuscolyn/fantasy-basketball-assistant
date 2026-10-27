@@ -82,6 +82,18 @@ python -m unittest discover -s tests -v
 
 Core calculations have deterministic unit tests. Scheduled builds also validate the published JSON's schema and reject forbidden fields.
 
+## October 2026: live scoring, acquisitions and projection history
+
+**Live matchup estimate:** The dashboard credits ESPN's `totalPointsLive` (falling back to `totalPoints`). When NBA games are already underway, it estimates only the unplayed fraction of regulation time using ESPN projected FP/G, without adding another full-game projection. That extra amount is an approximation, not a prediction from actual pace. Missing NBA clock data suppress affected projections. Started lineup positions are locked in the optimizer.
+
+**Acquisition policy:** The league's ESPN settings specify `matchupLimitPerScoringPeriod=true` and `matchupAcquisitionLimit=1`: **one acquisition per NBA scoring day**, typically up to seven in a full week. Season acquisition limit `-1` means no season-long cap. It uses traditional waivers (`waiverHours=24`) and a separate processing-hour setting. The app shows these rules, but ESPN's season-to-date team counters do **not** verify how many additions have already been made on a specific day. All hypothetical add/drops remain advisory; a claim's clearance date and same-day allowance must still be checked in ESPN.
+
+**Point-in-time trends:** Every successful scheduled dashboard build records a timestamped, allowlisted snapshot to the `projection-history` branch. Records contain only numeric per-player projections, ESPN NBA team IDs, and public NBA game tipoff times. The trend chart compares actual points to the **latest observed ESPN projection saved strictly before that game's tipoff**. When historical observations don't exist (including games before tracking started), the pregame expected value stays blank. We do not substitute a current projection for an older one.
+
+Scheduled builds are serialized, so they don't overwrite each other's archive records. Snapshots are retained in Git history, not in temporary Actions artifacts or raw ESPN API files.
+
+**Important:** The live remainder and future add/drop simulations remain estimates. We haven't incorporated per-player real-time scoring pace, verified same-day transaction usage, or detailed waiver-claim execution yet.
+
 ## Next improvements
 
 - Confirm acquisition/game-play limit fields with ESPN and model waivers properly.
