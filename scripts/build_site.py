@@ -4,6 +4,8 @@ import os
 from src.projection_history import save_snapshot, load, attach_game_projections
 from src.transaction_rules import transaction_settings
 from src.transactions import transaction_counts
+from src.outlook import (matchups_for_period, forecast_future_week,
+                         generate_outlook, evaluate_season_signal, matchup_for_team)
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -303,6 +305,42 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
     for player in metadata.values():
         player_info[str(player["id"])] = {k: v for k, v in player.items() if k != "lineup_slot_id"}
 
+    # Future matchups use explicit ESPN matchups, never inferred schedules.
+    # These projections freeze today's rosters; future transactions are unknown.
+    outlook = None
+    diagnostic = None
+    future = []
+    future_schedule = {}
+    try:
+        for ahead in (1, 2):
+            upcoming_period = period + ahead
+            upcoming_response = espn_fetch(["mMatchupScore"],
+                                           matchup_period=upcoming_period)
+            pairings = matchups_for_period(upcoming_response, upcoming_period)
+            if not pairings:
+                raise ValueError("Future matchup pairings missing")
+            future.append((ahead, upcoming_period, pairings))
+            beginning = week[0] + timedelta(days=ahead * 7)
+            for offset in range(7):
+                target = beginning + timedelta(days=offset)
+                future_schedule[target.isoformat()] = nba_fetch(target)
+        roster_today = {
+            str(team["id"]): [normalize_entry(e)
+                             for e in (team.get("roster") or {}).get("entries") or []]
+            for team in snapshot["teams"]
+        }
+        for roster in roster_today.values():
+            for p in roster:
+                if p.get("id") in metadata and p.get("projected_fppg") is None:
+                    p["projected_fppg"] = metadata[p["id"]]["projected_fppg"]
+        outlook = generate_outlook(week[0], period, output_matchups,
+                                   future, roster_today, future_schedule)
+        diagnostic = evaluate_season_signal(outlook, MY_TEAM_ID)
+    except (ValueError, EspnError, TypeError, KeyError) as error:
+        # Do not invent future schedule or opponent matchups.
+        diagnostic = {"recommendation": "Future schedule unavailable",
+                      "reason": "ESPN could not confirm the complete three-week outlook.",
+                      "caveats": ["Current matchup forecasts are unaffected."]}
     # Include current-week ESPN histories where ESPN explicitly returns daily actuals.
     history = _history(SEASON_DAY_ONE, today, espn_fetch, player_info)
     archive = os.getenv("COURTSIDE_HISTORY_DIR")
@@ -332,6 +370,8 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
         "matchup_period": period,
         "my_team_id": MY_TEAM_ID,
         "teams": list(teams.values()),
+        "three_week_outlook": outlook,
+        "season_guidance": diagnostic,
         "matchups": output_matchups,
         "team_analysis": week_team,
         "transaction_rules": rules,
