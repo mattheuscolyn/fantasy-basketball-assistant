@@ -20,7 +20,7 @@ This project is **not affiliated with ESPN**. The ESPN fantasy API is undocument
 - `.github/workflows/build-dashboard.yml`: runs the unit tests, builds and checks the site, uploads an expiring **private site preview**. Configured to refresh three times daily.
 - `.github/workflows/espn-sync.yml`: original manual ingestion audit and one-day private snapshot artifact.
 
-The site is a static build; visitors **never contact ESPN with your cookies**. No person can sign in to, edit, or transact within ESPN through this site.
+The free-agent discovery list currently includes up to 150 available/waiver players, sorted by ESPN rostered percentage. The site is a static build; visitors **never contact ESPN with your cookies**. No person can sign in to, edit, or transact within ESPN through this site.
 
 ## Required GitHub secrets
 
