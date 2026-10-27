@@ -137,6 +137,24 @@ def main():
             })
         except Exception as error:
             out["transaction_probe"].append({"period": period_id, "error_type": type(error).__name__})
+    out["future_matchup_probes"] = []
+    if isinstance(current, int):
+        for ahead in (1, 2):
+            next_period = current + ahead
+            try:
+                future = fetch(["mMatchupScore"], matchup_period=next_period)
+                matches = [m for m in future.get("schedule") or []
+                           if m.get("matchupPeriodId") == next_period]
+                out["future_matchup_probes"].append({
+                    "period": next_period,
+                    "games": [{"home": (m.get("home") or {}).get("teamId"),
+                               "away": (m.get("away") or {}).get("teamId")}
+                              for m in matches[:7]],
+                    "count": len(matches),
+                })
+            except Exception as err:
+                out["future_matchup_probes"].append(
+                    {"period": next_period, "error_type": type(err).__name__})
     Path("reports").mkdir(exist_ok=True)
     Path("reports/schema-diagnostic.json").write_text(json.dumps(out, indent=2))
 
