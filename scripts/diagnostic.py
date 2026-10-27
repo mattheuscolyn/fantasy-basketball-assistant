@@ -101,6 +101,26 @@ def main():
             }
         except Exception as error:
             out["views"][title] = {"error_type": type(error).__name__}
+    out["transaction_probe"] = []
+    for period_id in (day - 1, day):
+        try:
+            tx = fetch(["mTransactions2"], scoring_period=period_id)
+            rows = tx.get("transactions") or []
+            out["transaction_probe"].append({
+                "period": period_id,
+                "response_keys": sorted(tx.keys()),
+                "count": len(rows),
+                "sample": [
+                    {"team_id": row.get("teamId"),
+                     "type": row.get("type"), "status": row.get("status"),
+                     "scoring_period": row.get("scoringPeriodId"),
+                     "process_date": row.get("processDate"),
+                     "item_types": [x.get("type") for x in row.get("items") or []]}
+                    for row in rows[:8] if isinstance(row, dict)
+                ],
+            })
+        except Exception as error:
+            out["transaction_probe"].append({"period": period_id, "error_type": type(error).__name__})
     Path("reports").mkdir(exist_ok=True)
     Path("reports/schema-diagnostic.json").write_text(json.dumps(out, indent=2))
 
