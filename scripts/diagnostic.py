@@ -1,110 +1,100 @@
-"""One-time schema validation for current matchup and daily lineups.
-Never writes ESPN's raw response or cookies to artifact.
+"""Public-safe field-level audit of league transaction and live-scoring behavior.
+
+Never serialize API replies, owner/member objects, token values, or player details.
 """
 import json
 from pathlib import Path
 from src.espn_client import fetch
+from src.weekly import scoring_period, EASTERN
+from datetime import datetime
 
 
-def keys(value):
-    return sorted(value.keys()) if isinstance(value, dict) else []
+ALLOWED_SETTING_VALUES = {
+    "acquisitionLimit", "matchupAcquisitionLimit", "acquisitionType",
+    "waiverHours", "waiverProcessDays", "waiverProcessTime",
+    "waiverOrderReset", "waiverSystem", "waiverBudget",
+    "playerAddSystem", "freeAgentBudget", "matchupAcquisitionLimit",
+    "prohibitTransactionSet", "lineupLockType",
+}
+
+
+def scalar_config(value):
+    if not isinstance(value, dict):
+        return {}
+    return {k: v for k, v in value.items()
+            if k in ALLOWED_SETTING_VALUES and type(v) in (int, str, bool, float)}
+
+
+def side_probe(side):
+    if not isinstance(side, dict):
+        return {}
+    entries = ((side.get("rosterForCurrentScoringPeriod") or {}).get("entries") or [])
+    totals = {}
+    for k in ("totalPoints", "totalProjectedPointsLive", "totalPointsLive"):
+        if type(side.get(k)) in (int, float):
+            totals[k] = side[k]
+    if entries:
+        totals["entry_count"] = len(entries)
+        totals["scoring_field_presence"] = sorted(
+            k for k in (entries[0].get("playerPoolEntry") or {})
+            if k in {"appliedStatTotal", "appliedStats", "player", "stats",
+                     "appliedStatTotalLive"})
+        totals["applied_stat_total_examples"] = [
+            float((e.get("playerPoolEntry") or {}).get("appliedStatTotal"))
+            for e in entries[:3]
+            if type((e.get("playerPoolEntry") or {}).get("appliedStatTotal")) in (int, float)
+        ]
+    return totals
 
 
 def main():
     league = fetch(["mStatus", "mSettings", "mMatchupScore"])
     status = league.get("status") or {}
     settings = league.get("settings") or {}
-    sched_settings = settings.get("scheduleSettings") or {}
-    matchups = league.get("schedule") or []
-    period = status.get("currentMatchupPeriod")
-    scoring = status.get("currentScoringPeriod")
-    date_map = sched_settings.get("matchupPeriods") or {}
-    if not isinstance(period, int):
-        raise ValueError("No current ESPN matchup period; do not guess.")
-    # Probe a known scoring period from the prior private league snapshot if status omits the field.
-    if not isinstance(scoring, int):
-        scoring = 6
-    limited = {
-        "status_fields": keys(status),
-        "status_scalar_fields": {k: v for k, v in status.items() if isinstance(v, (str, int, float, bool))},
-        "current_period": period,
-        "current_scoring": scoring,
-        "schedule_settings_fields": keys(sched_settings),
-        "matchup_periods_current": date_map.get(str(period)),
-        "matchup_periods_sample": {str(k): v for k, v in list(date_map.items())[:3]},
-        "matchup_samples": [
-            {"period": m.get("matchupPeriodId"), "id": m.get("id"),
-             "home": (m.get("home") or {}).get("teamId"),
-             "away": (m.get("away") or {}).get("teamId")}
-            for m in matchups if m.get("matchupPeriodId") == period
-        ][:7],
-        "daily": [],
+    current = status.get("currentMatchupPeriod")
+    today = datetime.now(EASTERN).date()
+    day = scoring_period(today)
+    out = {
+        "date": today.isoformat(),
+        "period": current,
+        "scoring_period": day,
+        "settings": {
+            "acquisition": scalar_config(settings.get("acquisitionSettings")),
+            "roster": scalar_config(settings.get("rosterSettings")),
+            "general": scalar_config(settings),
+            "schedule": scalar_config(settings.get("scheduleSettings")),
+        },
+        "acquisition_keys": sorted((settings.get("acquisitionSettings") or {}).keys()),
+        "status_keys": sorted(status.keys()),
+        "team_transaction_keys": [],
+        "views": {},
     }
-    selected = [scoring, scoring + 1]
-    for day in selected:
+    team_view = fetch(["mTeam"])
+    teams = team_view.get("teams") or []
+    out["team_transaction_keys"] = sorted({
+        k for team in teams for k in team
+        if ("acquis" in k.lower() or "transact" in k.lower() or "waiv" in k.lower())
+    })
+    for title, views in (
+        ("matchup", ["mMatchupScore"]),
+        ("boxscore", ["mBoxscore"]),
+        ("live", ["mLiveScoring"]),
+        ("combined", ["mMatchupScore", "mBoxscore", "mLiveScoring"]),
+    ):
         try:
-            result = fetch(["mBoxscore", "mMatchupScore"], scoring_period=day, matchup_period=period)
-            matches = [m for m in result.get("schedule", [])
-                       if m.get("matchupPeriodId") == period]
-            match = matches[0] if matches else {}
-            sides = {}
-            for side in ["home", "away"]:
-                team = match.get(side) or {}
-                entries = (team.get("rosterForCurrentScoringPeriod") or {}).get("entries") or []
-                sample = entries[0] if entries else {}
-                pool = sample.get("playerPoolEntry") or {}
-                sides[side] = {
-                    "side_fields": keys(team),
-                    "roster_fields": keys(team.get("rosterForCurrentScoringPeriod")),
-                    "entry_count": len(entries),
-                    "slot_distribution": {
-                        str(slot): sum(x.get("lineupSlotId") == slot for x in entries)
-                        for slot in set(x.get("lineupSlotId") for x in entries)
-                    },
-                    "example_entry_fields": keys(sample),
-                    "example_pool_fields": keys(pool),
-                    "example_stat_labels": [
-                        {"season": s.get("seasonId"), "period": s.get("scoringPeriodId"),
-                         "source": s.get("statSourceId"), "split": s.get("statSplitTypeId"),
-                         "applied_total": s.get("appliedTotal"),
-                         "applied_average": s.get("appliedAverage")}
-                        for s in (pool.get("player") or {}).get("stats", [])[:8]
-                    ],
-                }
-            limited["daily"].append({"day": day, "matchup_count": len(matches),
-                                     "sample_matchup_fields": keys(match), "sides": sides})
-        except Exception as error:
-            limited["daily"].append({"day": day, "error_class": type(error).__name__})
-    # Probe player cards for verified game-by-game fantasy scoring history.
-    try:
-        cards = fetch(["kona_playercard"], player_filter={
-            "players": {
-                "filterIds": {"value": [1966, 3112335]},
-                "filterStatsForTopScoringPeriodIds": {
-                    "value": 35, "additionalValue": ["002027", "102027"]
-                },
+            result = fetch(views, scoring_period=day, matchup_period=current)
+            match = next((m for m in result.get("schedule") or []
+                          if m.get("matchupPeriodId") == current), {})
+            out["views"][title] = {
+                "schedule_count": len(result.get("schedule") or []),
+                "match_keys": sorted(match.keys()),
+                "home": side_probe(match.get("home")),
+                "away": side_probe(match.get("away")),
             }
-        })
-        rows = cards.get("players") or []
-        limited["player_card_probe"] = {
-            "player_count": len(rows),
-            "outer_keys": keys(rows[0]) if rows else [],
-            "stat_records": [{
-                "source": v.get("statSourceId"),
-                "split": v.get("statSplitTypeId"),
-                "period": v.get("scoringPeriodId"),
-                "season": v.get("seasonId"),
-                "applied_total": v.get("appliedTotal"),
-                "appearances_41": (v.get("stats") or {}).get("41"),
-                "appearances_42": (v.get("stats") or {}).get("42"),
-                "minutes_28": (v.get("stats") or {}).get("28")
-            } for v in (((rows[0].get("player") or {}).get("stats") or [])[:45])]
-            if rows else [],
-        }
-    except Exception as error:
-        limited["player_card_probe"] = {"error_class": type(error).__name__}
+        except Exception as error:
+            out["views"][title] = {"error_type": type(error).__name__}
     Path("reports").mkdir(exist_ok=True)
-    Path("reports/schema-diagnostic.json").write_text(json.dumps(limited, indent=2))
+    Path("reports/schema-diagnostic.json").write_text(json.dumps(out, indent=2))
 
 
 if __name__ == "__main__":
