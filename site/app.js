@@ -26,18 +26,19 @@ function render(){
 function renderLeague(){
   const liveTeams=Object.values(DATA.nba_schedule||{}).flatMap(byDay=>Object.values(byDay||{})).flat().filter(state=>state==="in").length;
   if(liveTeams>0){
-    const notice=el("div","alert");
-    const detail=el("div","stack");
+    const notice=el("div","alert"),detail=el("div","stack");
+    const incomplete=DATA.matchups.some(m=>m.projection_incomplete);
     add(detail,
-      el("strong","","Live-game projections are temporarily incomplete"),
-      el("span","hint","NBA games are in progress, but ESPN may not yet have added their scores to matchup totals. These estimates currently exclude points from games already underway. Treat the projected winner and margin as provisional until the scores update."));
-    add(notice,el("span","warning","⚠"),detail);
-    section.append(notice);
+      el("strong","",incomplete?"Live forecasts need more data":"NBA games in progress — projections are provisional"),
+      el("span","hint",incomplete?
+        "Some games lack verified clock data. Forecast totals are withheld rather than showing misleading numbers.":
+        "ESPN live matchup points are credited. Remaining in-progress points are estimated from the regulation game clock and season-long per-game projections; this is not a live statistical forecast."));
+    add(notice,el("span","warning","⚠"),detail);section.append(notice);
   }
   const top=el("div","stat-cards");
   const matches=DATA.matchups.filter(m=>!m.bye);
   const your=matches.find(m=>String(m.home_team_id)===String(DATA.my_team_id)||String(m.away_team_id)===String(DATA.my_team_id));
-  const margins=your?(your.home_team_id===DATA.my_team_id?your.home_projected-your.away_projected:your.away_projected-your.home_projected):null;
+  const margins=your&&Number.isFinite(your.home_projected)&&Number.isFinite(your.away_projected)?(your.home_team_id===DATA.my_team_id?your.home_projected-your.away_projected:your.away_projected-your.home_projected):null;
   add(top,numberText("Matchups",matches.length),numberText("League alerts",Object.values(DATA.team_analysis).reduce((n,t)=>n+t.alerts.length,0)),numberText("Your projected margin",margins));section.append(top);
   section.append(heading("This week's matchups",dateLabel(DATA.week_start)+" – "+dateLabel(DATA.week_end)));
   const grid=el("div","scoreboard");
@@ -49,7 +50,7 @@ function renderLeague(){
       const row=el("div","versus"),left=el("div","stack"),right=el("div","stack");
       const title=el("span","team-name"+(id===DATA.my_team_id?" you":""),getTeam(id).name);
       add(left,title,el("span","subscore","Earned "+fmt(actual)+" FP"));
-      add(right,el("span","score",projected===null?"Bye":fmt(projected)),el("span","subscore","Projected final"));
+      add(right,el("span","score",projected===null?(m.bye?"Bye":"Unavailable"):fmt(projected)),el("span","subscore","Projected final"));
       right.style.textAlign="right";add(row,left,right);box.append(row);
     });
     const warns=contestants.reduce((total,[id])=>total+(DATA.team_analysis[String(id)]?.alerts.length||0),0);
