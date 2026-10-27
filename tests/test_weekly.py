@@ -60,6 +60,23 @@ class WeeklyOptimizerTests(unittest.TestCase):
         ]
         self.assertEqual(lineup_alert(players, {})["potential_gain"], 0)
 
+    def test_locked_started_players_cannot_be_moved(self):
+        locked = player(1, 10, [4, 12], 4, team=16)
+        bench = player(2, 40, [4, 12], 12, team=17)
+        score, picks = best_lineup(
+            [locked, bench], {16: ["in"], 17: ["pre"]})
+        self.assertEqual(score, 0)
+        self.assertEqual(picks, [])
+
+    def test_started_util_reserves_only_one_of_three_util_slots(self):
+        locked = player(1, 30, [11, 12], 11, team=16)
+        bench = player(2, 40, [11, 12], 12, team=17)
+        score, picks = best_lineup(
+            [locked, bench], {16: ["in"], 17: ["pre"]})
+        self.assertEqual(score, 40)
+        self.assertEqual(len(picks), 1)
+        self.assertEqual(picks[0]["slot_id"], 11)
+
     def test_acquisition_in_future_only(self):
         today = date(2026, 10, 26)
         tomorrow = "2026-10-27"
