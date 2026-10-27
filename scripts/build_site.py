@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from src.espn_client import EspnError, fetch, fetch_snapshot
+from src.live import active_in_progress_projection, credited_points, live_game_details
 from src.report import projected_season_fppg
 from src.weekly import (EASTERN, SEASON_DAY_ONE, current_week, entries_for_day,
                         evaluate_add_drops, lineup_alert, nba_day, normalize_entry,
@@ -26,8 +27,10 @@ def _normalize_matchups(schedule, period):
             "id": item.get("id"),
             "home_team_id": home["teamId"],
             "away_team_id": away.get("teamId"),
-            "home_actual": float(home.get("totalPoints") or 0),
-            "away_actual": float(away.get("totalPoints") or 0),
+            "home_actual": credited_points(home)[0],
+            "away_actual": credited_points(away)[0],
+            "home_score_source": credited_points(home)[1],
+            "away_score_source": credited_points(away)[1],
             "bye": away.get("teamId") is None,
         })
     return result
@@ -143,7 +146,8 @@ def _history(league_start, today, espn_fetch, player_metadata=None):
     }
 
 
-def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch, snapshot_fetch=fetch_snapshot):
+def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
+               snapshot_fetch=fetch_snapshot, live_fetch=live_game_details):
     today = today or datetime.now(EASTERN).date()
     week = current_week(today)
     league = espn_fetch(["mStatus", "mMatchupScore", "mSettings"])
@@ -197,6 +201,16 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch, snapshot_fetc
                         p[field] = info.get(field)
         daily[key] = rosters
 
+    # Ongoing games are locked. Their earned points belong in ESPN's live
+    # score. Add only a conservative estimate of remaining regulation time.
+    live_details = {}
+    live_error = None
+    live_today = today.isoformat()
+    if any("in" in states for states in nba_schedule[live_today].values()):
+        try:
+            live_details = live_fetch(today)
+        except ValueError:
+            live_error = "NBA live clock unavailable"
     week_team = {}
     for tid in teams:
         daily_by_team = {d: value[tid] for d, value in daily.items()}
