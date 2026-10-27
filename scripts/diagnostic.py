@@ -14,6 +14,7 @@ ALLOWED_SETTING_VALUES = {
     "waiverHours", "waiverProcessDays", "waiverProcessTime",
     "waiverOrderReset", "waiverSystem", "waiverBudget",
     "playerAddSystem", "freeAgentBudget", "matchupAcquisitionLimit",
+    "matchupLimitPerScoringPeriod", "waiverProcessHour", "transactionLockingEnabled",
     "prohibitTransactionSet", "lineupLockType",
 }
 
@@ -67,6 +68,7 @@ def main():
         "acquisition_keys": sorted((settings.get("acquisitionSettings") or {}).keys()),
         "status_keys": sorted(status.keys()),
         "team_transaction_keys": [],
+        "team_transaction_counts": [],
         "views": {},
     }
     team_view = fetch(["mTeam"])
@@ -75,6 +77,12 @@ def main():
         k for team in teams for k in team
         if ("acquis" in k.lower() or "transact" in k.lower() or "waiv" in k.lower())
     })
+    out["team_transaction_counts"] = [
+        {"team_id": t.get("id"), "counter": {
+            str(k): v for k, v in (t.get("transactionCounter") or {}).items()
+            if type(v) in (int, float)
+        }} for t in teams if t.get("id") is not None
+    ]
     for title, views in (
         ("matchup", ["mMatchupScore"]),
         ("boxscore", ["mBoxscore"]),
