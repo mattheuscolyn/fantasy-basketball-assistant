@@ -7,9 +7,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/build_site.py'
-      - 'src/weekly.py'
-      - 'src/espn_client.py'
-      - 'src/report.py'
+      - 'src/**'
       - 'site/**'
       - 'tests/**'
       - '.github/workflows/build-dashboard.yml'
