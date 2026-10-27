@@ -282,6 +282,24 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
 
     # Include current-week ESPN histories where ESPN explicitly returns daily actuals.
     history = _history(SEASON_DAY_ONE, today, espn_fetch, player_info)
+    archive = os.getenv("COURTSIDE_HISTORY_DIR")
+    historic_projections = []
+    if archive:
+        # Store only numeric player projections, NBA team IDs and public tips.
+        game_times = {}
+        for day in week:
+            try:
+                details = live_game_details(day)
+                game_times[day.isoformat()] = {
+                    tid: game["tipoff_utc"] for tid, game in details.items()
+                    if game.get("tipoff_utc")
+                }
+            except ValueError:
+                # No guess is substituted for a missing NBA game start time.
+                continue
+        save_snapshot(archive, player_info, game_times)
+        historic_projections = load(archive)
+    attach_game_projections(history, historic_projections)
     return {
         "schema_version": 2,
         "generated_at_utc": datetime.utcnow().isoformat() + "Z",
