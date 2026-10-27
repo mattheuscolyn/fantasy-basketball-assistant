@@ -1,47 +1,90 @@
-# Fantasy Basketball Assistant
+# Courtside · Fantasy Basketball Assistant
 
-A private, **read-only** ESPN Fantasy Basketball integration for the 2026–27 **2026-7 fam league** (league ID **394231780**, seven teams, head-to-head points).
+**Read-only mobile dashboard for the 2026–27 ESPN league (ID 394231780).** Team TayTay is the featured team, but the dashboard covers all seven teams.
 
-## What's implemented
+## What works
 
-A manually triggered GitHub Actions sync that:
-- Authenticates to the private league with credentials stored in GitHub Actions secrets.
-- Reads ESPN's scoring rules, current seven team rosters, and player injury statuses.
-- Requests the top 50 free agents or waiver players by ESPN rostered percentage.
-- Writes a scoring audit, roster inventory, and available-player report to the **private GitHub Actions run Summary**. Uploads a **sanitized, private, one-day GitHub Actions artifact** named `espn-private-league-snapshot`; it contains only allowlisted league rules, team names/IDs, rosters, basic player stats, and up to 50 available players. It excludes ESPN session cookies, member emails, and owner identities.
-- Checks that data are actually present, rather than silently claiming a successful empty import.
+- **League:** Current head-to-head matchups, byes, actual points and a projected finish calculated using season-long ESPN fantasy points per game for remaining *unstarted* NBA games.
+- **Lineups:** Read the seven daily ESPN lineups for the matchup; detect eligible, higher-scoring lineup arrangements subject to the league's PG/SG/SF/PF/C/G/F and three UTIL slots.
+- **Opportunities:** Simulate one hypothetical add/drop against a limited pool of ESPN free agents and show the projected remaining-week difference. Moves are never executed.
+- **Trends:** Backfill recent actual game-by-game fantasy scores for rostered and available players from ESPN player cards; compare their 3-game rolling average with ESPN's *current* projected FP/G.
 
-This is an ingestion audit, **not** yet a projection model or an add/drop recommendation engine. It makes **read-only GET requests** and will never make roster transactions. It does not schedule itself.
+This project is **not affiliated with ESPN**. The ESPN fantasy API is undocumented and can change. All calculations are advisory.
 
-## First run
+## Repository architecture
 
-1. In the repository, visit **Settings → Secrets and variables → Actions**.
-2. Add repository secret `ESPN_S2` with your complete ESPN `espn_s2` browser cookie.
-3. Add repository secret `ESPN_SWID` with your complete ESPN `SWID` browser cookie (including the surrounding curly braces).
-4. Visit **Actions → ESPN private league read-only sync → Run workflow** on branch `main`.
-5. Open the completed run and read the **Summary**. A failed data-quality check will mark the workflow as unsuccessful.
-6. On that run's page, open **Artifacts → espn-private-league-snapshot** to download the limited JSON snapshot. The artifact expires in **1 day**. You can share the GitHub Actions **run URL** with ChatGPT to locate this artifact via connected GitHub access.
+- `src/espn_client.py`: authenticated GET-only ESPN fantasy API client.
+- `src/weekly.py`: NBA schedule ingestion, starter eligibility and points optimization.
+- `scripts/build_site.py`: private ESPN sync → allowlisted public-safe `site/data.json`.
+- `site/`: static responsive HTML/CSS/JavaScript dashboard, including SVG trend charts.
+- `.github/workflows/build-dashboard.yml`: runs the unit tests, builds and checks the site, uploads an expiring **private site preview**. Configured to refresh three times daily.
+- `.github/workflows/espn-sync.yml`: original manual ingestion audit and one-day private snapshot artifact.
 
-Session cookies grant access to your ESPN account. Never paste them into chat, a commit, an issue, or logs. If they expire, replace the two secrets with fresh values. If they leak, sign out of ESPN sessions / rotate credentials.
+The site is a static build; visitors **never contact ESPN with your cookies**. No person can sign in to, edit, or transact within ESPN through this site.
 
-The connection uses ESPN's unofficial API. ESPN can modify or block its endpoints without notice, so the first run needs validation. If a run fails, share the **non-sensitive error text** only, not the raw API response, request headers, or cookies.
+## Required GitHub secrets
 
-## Local test
+From your signed-in ESPN browser, store these in **Settings → Secrets and variables → Actions**:
 
-Python 3.12 and its standard library are enough:
+- `ESPN_S2`: complete `espn_s2` cookie.
+- `ESPN_SWID`: complete `SWID` cookie, including braces.
+
+These secrets are **login session credentials**. Never paste them into the README, source, issues, Actions logs, or chat.
+
+## Preview
+
+Open [Build Courtside dashboard](https://github.com/mattheuscolyn/fantasy-basketball-assistant/actions/workflows/build-dashboard.yml), select the latest successful run, and download the `courtside-site-preview` artifact. It includes `index.html`, `styles.css`, `app.js`, and generated `data.json`. Serve that directory through any static HTTP server to see the interactive interface.
+
+To use locally:
+
+```bash
+python -m http.server 8000 --directory site
+```
+
+Then visit `http://localhost:8000`. Browsers may block data fetches directly from `file://`, so use an HTTP server.
+
+## Public GitHub Pages deployment (opt-in)
+
+The **GitHub Free** plan generally requires a public repository for GitHub Pages. If you don't have private-repository Pages access, make the repository public only after reviewing the published fields—or publish the sanitized `site/` output in a separate public repository to keep all integration source private.
+
+To enable Pages on this repository if eligible:
+
+1. Open **Settings → Pages** and set **Source** to **GitHub Actions**.
+2. Open **Settings → Secrets and variables → Actions → Variables** and create `ENABLE_PUBLIC_PAGES` with value `true`.
+3. Start **Actions → Build Courtside dashboard → Run workflow**. Once validated, the scheduled refreshes will also deploy.
+4. View the URL listed in the successful deploy job.
+
+**Public data:** Fantasy team names/IDs, NBA player names/IDs, roster placement, projected fantasy scores, public NBA game schedules and game results, and advisory lineup/move analysis. The build rejects known sensitive fields such as cookies, emails, owner IDs and member IDs. The public payload is allowlist-constructed; full API responses and credentials are not published.
+
+## How projections work
+
+- ESPN matchup `totalPoints` is the actual-to-date source of truth.
+- Remaining points are based on **the daily lineup currently saved in ESPN**, not on a hypothetical team of the best ten players.
+- A game counts only if its NBA schedule state is **pre-game** and the player is not marked out/inactive. Live games aren't forecast further until a more accurate live-remaining method is available.
+- Optimized points use a ten-slot eligible lineup (including three UTIL positions) each day; current projected total and optimized projected total are shown separately.
+- Add/drop scenarios assume the new player is immediately available for **future days only**, and don't model waivers, acquisition caps, injury changes, games-played caps, or the risk of losing a dropped player. Treat as ideas requiring manual review, not orders.
+- The trends page compares historical actual scoring against the **latest** ESPN season projection, not historical predictions saved before each game. DNP/zero-filled ESPN records are excluded unless a games-played flag confirms participation.
+
+## Data reliability and security
+
+- The backend fails rather than guessing if ESPN daily rosters are missing, an NBA schedule response is invalid, or the league's team count changes.
+- Team owners, member IDs, emails, account identities, and credentials are not requested in the public dataset.
+- Read-only requests only: no trade, claim, drop or lineup mutation endpoints.
+- Public Pages deployment is disabled until you explicitly opt in using the repository variable.
+- Refresh can lag ESPN or be delayed by scheduled GitHub Actions. A “last updated” timestamp is displayed.
+- As ESPN changes, projections can be inaccurate—do not assume a calculated advantage guarantees a win.
+
+## Tests
 
 ```bash
 python -m unittest discover -s tests -v
-# If credentials are already in the local environment:
-python -m scripts.sync
 ```
 
-The workflow output is restricted to viewers of this private repository, but still includes league members' rosters and should be treated as private. The program does not commit snapshots to source control. The allowlisted snapshot is uploaded to a private, expiring Actions artifact after validation, and can only be viewed by those with appropriate repository access.
+Core calculations have deterministic unit tests. Scheduled builds also validate the published JSON's schema and reject forbidden fields.
 
-## After the first successful report
+## Next improvements
 
-1. Confirm all seven team rosters and the exact scoring formula against ESPN.
-2. Identify your team and audit lineup slots, acquisition/waiver rules, and matchup calendar.
-3. Add schedule- and injury-aware projections, with safeguards against double-counting.
-4. Test add/drop and lineup optimization by measuring subsequent actual performance.
-5. Optionally schedule monitoring, keeping transactions manual until you choose otherwise.
+- Confirm acquisition/game-play limit fields with ESPN and model waivers properly.
+- Widen free-agent coverage beyond the first 50 players.
+- Preserve **point-in-time projection snapshots** for prospective trend analysis.
+- Add lineup-lock awareness, postgame forecast calibration and personalized protected-player preferences.
