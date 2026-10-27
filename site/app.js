@@ -40,7 +40,7 @@ function initProtect(){
     if(saved&&typeof saved==="object"&&!Array.isArray(saved)){protect=saved;return;}
   }catch(e){}
   protect={};
-  getProtectedPlayers().slice(0,8).forEach(p=>{protect[String(p.id)]=true});
+  getProtectedPlayers().forEach((p,i)=>{if(i<10 || (p.projected_fppg||0)>=35)protect[String(p.id)]=true});
 }
 function saveProtect(){
   try{localStorage.setItem("courtside-protected-"+DATA.my_team_id,JSON.stringify(protect));}catch(e){}
@@ -104,7 +104,7 @@ function renderStrategy(){
     section.append(evidence);
   }
   const prefs=panel("Protect your roster","Stored only on this device");
-  prefs.append(el("p","hint","Protected players are excluded from streaming-plan drop suggestions. Your eight highest-projected rostered players start protected; change these based on your preferences."));
+  prefs.append(el("p","hint","Protected players are excluded from streaming-plan drop suggestions. Your strongest players start protected (top ten and anyone projected for at least 35 FP/G); change these based on your preferences."));
   const choices=el("div","protection-grid");
   getProtectedPlayers().forEach(p=>{
     const label=el("label","player-check"),check=el("input");
@@ -125,7 +125,7 @@ function renderStrategy(){
   add(actions,conservative,aggressive);plans.append(actions);
   const all=DATA.streaming_plans||[];
   const filtered=all.filter(p=>!protect[String(p.drop_id)]&&
-      (riskMode==="aggressive" || p.three_week_net_points===null||p.three_week_net_points>=0));
+      (riskMode==="aggressive" || (p.three_week_net_points!==null&&p.three_week_net_points>=0)));
   if(!filtered.length){
     plans.append(el("div","empty","No eligible streaming plan passes the current player protection and risk settings. Holding your roster is a valid decision."));
   }else{
@@ -147,7 +147,7 @@ function renderStrategy(){
       plans.append(item);
     });
   }
-  plans.append(el("p","hint","Schedules and injury statuses can change. Plans assume listed free agents remain available and their acquisitions clear before the specified days. Three-week point differences are not calibrated win probabilities."));
+  plans.append(el("p","hint","When an injured player is dropped, future-week value is unknown until their return date is established. Such moves are hidden in Conservative mode. Schedules and injury statuses can change. Plans assume listed free agents remain available and their acquisitions clear before the specified days. Three-week point differences are not calibrated win probabilities."));
   section.append(plans);
 }
 function renderLeague(){
