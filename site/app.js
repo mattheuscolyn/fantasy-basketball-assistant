@@ -118,14 +118,18 @@ function renderMoves(){
   section.append(heading("Potential one-player swaps","Team TayTay · advisory only"));
   const rules=DATA.transaction_rules;
   if(rules){
-    const daily=rules.daily_limit_enabled&&rules.per_scoring_period!==null?
-      rules.per_scoring_period+" acquisition per scoring period":
-      "Matchup acquisition allowance unverified";
-    const hours=rules.waiver_hours!==null?rules.waiver_hours+"-hour":"unverified";
-    const note=el("div","help","ESPN settings: "+daily+"; "+hours+
-      " traditional waiver window. Season acquisitions: "+
-      (rules.season_limit===null?"unlimited":rules.season_limit)+
-      ". Already-used daily moves and individual player availability aren't yet confirmed. Verify ESPN's effective transaction date before acting.");
+    const max=rules.maximum_matchup_additions;
+    const used=rules.executed_additions_by_team?.[String(DATA.my_team_id)];
+    const remaining=rules.remaining_by_team?.[String(DATA.my_team_id)];
+    const pending=rules.pending_claims_by_team?.[String(DATA.my_team_id)];
+    const allowance=max===null?"Matchup limit unavailable":max+" additions allowed this matchup";
+    const usage=rules.usage_verified?
+      " Team TayTay has used "+used+"; "+remaining+" remain.":
+      " Completed-transaction counts could not be verified.";
+    const hours=rules.waiver_hours!==null?rules.waiver_hours+"-hour":"unspecified";
+    const note=el("div","help","ESPN: "+allowance+"."+usage+
+      (pending?" "+pending+" pending claims may consume additional moves.":"")+
+      " Traditional "+hours+" waivers; players already listed as free agents may be added immediately. Confirm each player's transaction timing in ESPN.");
     section.append(note);
   }
   section.append(el("div","help","Scenarios are provisional: they assume immediately available replacements, and do not guarantee waiver clearance, unlocked games, or that dropping a player is worth the permanent-loss risk. No transactions are performed."));
