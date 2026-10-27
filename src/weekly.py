@@ -221,16 +221,36 @@ def evaluate_add_drops(daily_lineups, nba_schedule, available, today):
                 continue
             if not isinstance(addition.get("projected_fppg"), (int, float)):
                 continue
+            availability = addition.get("availability_status")
+            if availability not in ("FREEAGENT", "WAIVERS"):
+                continue
+            if availability == "WAIVERS":
+                timestamp = addition.get("waiver_process_at_utc")
+                if not timestamp:
+                    continue
+                try:
+                    cleared = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                    first_usable = cleared.astimezone(EASTERN).date() + timedelta(days=1)
+                except ValueError:
+                    continue
+            else:
+                first_usable = today + timedelta(days=1)
             new_player = dict(addition, lineup_slot_id=BENCH)
             after = 0
             for day in days:
                 entries = [p for p in daily_lineups[day] if p["id"] != drop["id"]]
-                after += best_lineup(entries + [new_player], nba_schedule[day])[0]
+                if date.fromisoformat(day) >= first_usable:
+                    entries.append(new_player)
+                after += best_lineup(entries, nba_schedule[day])[0]
             gain = round(after - before, 1)
             if gain >= 5:
                 suggestions.append({
                     "drop": drop["name"], "add": addition["name"],
                     "projected_gain": gain, "risk": "Dropped player may be permanently lost",
-                    "note": "Assumes immediate acquisition and no waiver delay; confirmation required.",
+                    "availability_status": availability,
+                    "first_usable_day": first_usable.isoformat(),
+                    "waiver_process_at_utc": addition.get("waiver_process_at_utc"),
+                    "note": ("Future-days-only estimate; waiver dates are conservative. "
+                             "Clearance does not guarantee a successful claim."),
                 })
     return sorted(suggestions, key=lambda x: x["projected_gain"], reverse=True)[:12]
