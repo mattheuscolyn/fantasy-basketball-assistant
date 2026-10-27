@@ -101,6 +101,22 @@ def main():
             }
         except Exception as error:
             out["views"][title] = {"error_type": type(error).__name__}
+    try:
+        pool = fetch(["kona_player_info"], player_filter={
+            "players": {"filterStatus": {"value": ["FREEAGENT", "WAIVERS"]},
+                        "limit": 10}})
+        rows = pool.get("players") or []
+        out["player_availability_probe"] = [
+            {"entry_keys": sorted(e.keys()),
+             "status": e.get("status"),
+             "pool_status": (e.get("playerPoolEntry") or {}).get("status"),
+             "player_status": (e.get("player") or {}).get("status"),
+             "waiver_process_date": e.get("waiverProcessDate"),
+             "on_team_id": e.get("onTeamId")}
+            for e in rows[:8] if isinstance(e, dict)
+        ]
+    except Exception as error:
+        out["player_availability_probe"] = {"error_type": type(error).__name__}
     out["transaction_probe"] = []
     for period_id in (day - 1, day):
         try:
