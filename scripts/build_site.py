@@ -372,6 +372,28 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
         save_snapshot(archive, player_info, game_times)
         historic_projections = load(archive)
     attach_game_projections(history, historic_projections)
+    performance_signals = {}
+    # Match only pre-tipoff forecasts for players on the current roster.
+    # This is descriptive roster production, not credited lineup scoring.
+    for team in snapshot["teams"]:
+        observations = []
+        for entry in (team.get("roster") or {}).get("entries") or []:
+            p = normalize_entry(entry)
+            for game in history.get(str(p["id"]), []):
+                if (week[0].isoformat() <= game.get("date", "") < today.isoformat()
+                        and type(game.get("expected_at_game")) in (int, float)
+                        and type(game.get("actual")) in (int, float)):
+                    observations.append(game["actual"] - game["expected_at_game"])
+        performance_signals[str(team["id"])] = {
+            "matched_games": len(observations),
+            "actual_minus_expected": (round(sum(observations) / len(observations), 1)
+                                      if len(observations) >= 5 else None),
+            "status": "Sufficient preliminary sample" if len(observations) >= 5
+                      else "Insufficient pregame observations",
+        }
+    if outlook:
+        diagnostic = evaluate_season_signal(
+            outlook, MY_TEAM_ID, performance_signals.get(str(MY_TEAM_ID)))
     return {
         "schema_version": 2,
         "generated_at_utc": datetime.utcnow().isoformat() + "Z",
@@ -383,6 +405,7 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
         "teams": list(teams.values()),
         "three_week_outlook": outlook,
         "season_guidance": diagnostic,
+        "performance_signals": performance_signals,
         "streaming_plans": planned_streams,
         "matchups": output_matchups,
         "team_analysis": week_team,
