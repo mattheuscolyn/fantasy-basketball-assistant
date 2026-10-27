@@ -116,7 +116,19 @@ function gamePoints(p,date){
 }
 function renderMoves(){
   section.append(heading("Potential one-player swaps","Team TayTay · advisory only"));
-  section.append(el("div","help","These are hypothetical points gained from optimizing remaining future lineups after a single add/drop. They assume an immediately usable addition. Waiver delays, acquisition limits and permanent loss of dropped players are not yet modeled. No transactions are performed."));
+  const rules=DATA.transaction_rules;
+  if(rules){
+    const daily=rules.daily_limit_enabled&&rules.per_scoring_period!==null?
+      rules.per_scoring_period+" acquisition per scoring period":
+      "Matchup acquisition allowance unverified";
+    const hours=rules.waiver_hours!==null?rules.waiver_hours+"-hour":"unverified";
+    const note=el("div","help","ESPN settings: "+daily+"; "+hours+
+      " traditional waiver window. Season acquisitions: "+
+      (rules.season_limit===null?"unlimited":rules.season_limit)+
+      ". Already-used daily moves and individual player availability aren't yet confirmed. Verify ESPN's effective transaction date before acting.");
+    section.append(note);
+  }
+  section.append(el("div","help","Scenarios are provisional: they assume immediately available replacements, and do not guarantee waiver clearance, unlocked games, or that dropping a player is worth the permanent-loss risk. No transactions are performed."));
   if(!DATA.opportunities.length){section.append(el("div","empty","No meaningful simple add/drop opportunities found in the imported free-agent sample."));return;}
   const layout=el("div","grid");
   DATA.opportunities.forEach(m=>{
@@ -146,7 +158,7 @@ function renderTrends(){
     const matched=games.filter(g=>typeof g.expected_at_game==="number");
     const priorActual=matched.length?matched.reduce((n,g)=>n+g.actual,0)/matched.length:null;
     const priorExpected=matched.length?matched.reduce((n,g)=>n+g.expected_at_game,0)/matched.length:null;
-    return {...p,id,games,actual,matchedCount:matched.length,priorExpected,
+    return {...p,id,games,actual,matchedActual:priorActual,matchedCount:matched.length,priorExpected,
       delta:matched.length?priorActual-priorExpected:null};
   }).filter(Boolean).sort((a,b)=>(b.delta??-999)-(a.delta??-999));
   section.append(heading("Performance trends","Actual game points vs. the ESPN projections saved before tipoff"));
@@ -156,7 +168,7 @@ function renderTrends(){
   add(controls,el("label","","Select player"),playerSelect(players));section.append(controls);
   const chosen=players.find(p=>String(p.id)===chartPlayer)||players[0];
   const top=el("div","stat-cards");
-  add(top,numberText("Actual FP/G",chosen.actual),numberText("Pregame expectation",chosen.priorExpected),numberText("Matched-game difference",chosen.delta));
+  add(top,numberText("Matched actual FP/G",chosen.matchedActual),numberText("Pregame expectation",chosen.priorExpected),numberText("Matched-game difference",chosen.delta));
   section.append(top);
   const chartBox=panel(chosen.name,"Game-by-game production · "+chosen.games.length+" observed games");
   chartBox.append(makeGraph(chosen.games));
@@ -170,7 +182,7 @@ function renderTrends(){
   const h=el("tr");["Player","Games","Actual","Expected","Δ / game"].forEach(x=>h.append(el("th","",x)));table.append(h);
   [...players].filter(p=>p.matchedCount>=3&&p.delta!==null).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta)).slice(0,25).forEach(p=>{
     const row=el("tr");
-    [p.name,p.matchedCount,fmt(p.actual),fmt(p.priorExpected),fmt(p.delta)].forEach((val,i)=>{
+    [p.name,p.matchedCount,fmt(p.matchedActual),fmt(p.priorExpected),fmt(p.delta)].forEach((val,i)=>{
       const c=el("td",i>0?"num":"",val);
       if(i===4)c.classList.add(p.delta>0?"good":"danger");
       row.append(c);
