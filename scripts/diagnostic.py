@@ -104,7 +104,7 @@ def main():
     try:
         pool = fetch(["kona_player_info"], player_filter={
             "players": {"filterStatus": {"value": ["FREEAGENT", "WAIVERS"]},
-                        "limit": 10}})
+                        "limit": 50, "sortPercOwned": {"sortPriority": 1, "sortAsc": False}})
         rows = pool.get("players") or []
         out["player_availability_probe"] = [
             {"entry_keys": sorted(e.keys()),
