@@ -133,9 +133,19 @@ def best_lineup(entries, games, *, exclude_ids=()):
     Slots with the same role are retained individually for capacity constraints.
     """
     forbidden = set(exclude_ids)
-    eligible = [p for p in entries
-                if p.get("id") not in forbidden
-                and p.get("lineup_slot_id") != INJURED_RESERVE]
+    locked_slots = []
+    eligible = []
+    for p in entries:
+        if p.get("id") in forbidden or p.get("lineup_slot_id") == INJURED_RESERVE:
+            continue
+        state = game_state(p, games)
+        # An active player whose NBA game started has an immovable lineup
+        # slot. Never reuse it for a theoretical bench-to-starter swap.
+        if p.get("lineup_slot_id") in ACTIVE_SLOTS and (
+                "in" in state or "post" in state):
+            locked_slots.append(p["lineup_slot_id"])
+        else:
+            eligible.append(p)
     if len(eligible) > 18:
         raise ValueError("Unexpectedly large ESPN roster; cannot safely optimize.")
     @lru_cache(None)
@@ -154,7 +164,15 @@ def best_lineup(entries, games, *, exclude_ids=()):
                 if candidate[0] > best[0] + 0.001:
                     best = candidate
         return best
-    value, assignment = solve(0, 0)
+    used = 0
+    for locked_slot in locked_slots:
+        for j, slot in enumerate(ACTIVE_SLOTS):
+            if slot == locked_slot and not (used >> j) & 1:
+                used |= 1 << j
+                break
+        else:
+            raise ValueError("More locked players than available lineup slots.")
+    value, assignment = solve(0, used)
     return round(value, 2), [{"player_id": pid, "slot_id": slot}
                               for pid, slot in assignment]
 
