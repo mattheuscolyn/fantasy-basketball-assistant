@@ -50,7 +50,7 @@ def _daily_actual(entry, period):
     return float(chosen["appliedTotal"])
 
 
-def _history(league_start, today, espn_fetch):
+def _history(league_start, today, espn_fetch, player_metadata=None):
     """Historical game-level actuals from ESPN's day-scoped team roster feed.
 
     Query each historical scoring day, keeping ONLY stat-source 0 / split 5
@@ -93,6 +93,49 @@ def _history(league_start, today, espn_fetch):
                     continue
                 # Keep the game only once per player/day, even across multiple rosters.
                 history.setdefault(str(pid), {})[day.isoformat()] = float(record["appliedTotal"])
+    # ESPN's historical mRoster covers only rostered players. Player cards
+    # extend trend coverage to free agents, including past team transactions.
+    if player_metadata:
+        ids = sorted(int(pid) for pid in player_metadata if str(pid).isdigit())
+        for offset in range(0, len(ids), 20):
+            batch = ids[offset:offset + 20]
+            try:
+                response = espn_fetch(["kona_playercard"], player_filter={
+                    "players": {
+                        "filterIds": {"value": batch},
+                        "filterStatsForTopScoringPeriodIds": {
+                            "value": 75,
+                            "additionalValue": ["002027", "102027"],
+                        },
+                    }
+                })
+            except EspnError:
+                # Core forecasts can continue if the optional history view
+                # fails. Historical trend coverage will be incomplete.
+                continue
+            for entry in response.get("players") or []:
+                player = entry.get("player") or {}
+                pid = player.get("id") or entry.get("id")
+                if pid is None:
+                    continue
+                for s in player.get("stats") or []:
+                    day = s.get("scoringPeriodId")
+                    total = s.get("appliedTotal")
+                    if not (s.get("seasonId") == 2027
+                            and s.get("statSourceId") == 0
+                            and s.get("statSplitTypeId") == 5
+                            and isinstance(day, int) and 1 <= day < scoring_period(today)
+                            and isinstance(total, (int, float))):
+                        continue
+                    raw = s.get("stats") or {}
+                    # DNP zero records lack a valid appearance count.
+                    if not isinstance(raw, dict) or not (
+                        float(raw.get("42") or 0) > 0
+                        or float(raw.get("41") or 0) > 0
+                    ):
+                        continue
+                    when = (league_start + timedelta(days=day - 1)).isoformat()
+                    history.setdefault(str(pid), {})[when] = float(total)
     return {
         pid: [{"date": when, "actual": actual}
               for when, actual in sorted(record.items())]
@@ -199,7 +242,7 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch, snapshot_fetc
         player_info[str(player["id"])] = {k: v for k, v in player.items() if k != "lineup_slot_id"}
 
     # Include current-week ESPN histories where ESPN explicitly returns daily actuals.
-    history = _history(SEASON_DAY_ONE, today, espn_fetch)
+    history = _history(SEASON_DAY_ONE, today, espn_fetch, player_info)
     return {
         "schema_version": 2,
         "generated_at_utc": datetime.utcnow().isoformat() + "Z",
