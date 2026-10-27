@@ -290,7 +290,12 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
         rules["remaining_by_team"] = {tid: None for tid in teams}
     free_agents = [normalize_entry(a) for a in snapshot["free_agents"]]
     next_days = {d: daily[d][str(MY_TEAM_ID)] for d in daily}
-    opportunities = evaluate_add_drops(next_days, nba_schedule, free_agents, today)
+    remaining_moves = rules.get("remaining_by_team", {}).get(str(MY_TEAM_ID))
+    opportunities = (evaluate_add_drops(next_days, nba_schedule, free_agents, today)
+                     if remaining_moves is None or remaining_moves > 0 else [])
+    for move in opportunities:
+        move["availability_verified"] = False
+        move["acquisition_cost"] = 1
     player_info = {}
     for p in free_agents:
         if p["id"] is not None:
