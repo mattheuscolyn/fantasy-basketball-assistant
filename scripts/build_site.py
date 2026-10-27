@@ -223,9 +223,26 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
             ideal += issue["best_projected_remaining"]
             if issue["potential_gain"] >= 0.5:
                 alerts.append({"date": day, **issue})
+        live_add = 0.0
+        live_incomplete = False
+        started = 0
+        if any("in" in states for states in nba_schedule[live_today].values()):
+            value, started = active_in_progress_projection(
+                daily[live_today][tid], live_details)
+            if live_error:
+                live_incomplete = any(
+                    p.get("lineup_slot_id") in (0, 1, 2, 3, 4, 5, 6, 11)
+                    and "in" in (nba_schedule[live_today].get(p.get("pro_team_id")) or [])
+                    for p in daily[live_today][tid])
+            else:
+                live_incomplete = value is None
+                live_add = value or 0.0
         week_team[tid] = {
-            "remaining_expected": round(baseline, 1),
-            "remaining_optimized": round(ideal, 1),
+            "remaining_expected": round(baseline + live_add, 1),
+            "remaining_optimized": round(ideal + live_add, 1),
+            "live_estimated_remaining": round(live_add, 1),
+            "live_started_players": started,
+            "live_estimate_incomplete": live_incomplete,
             "alerts": alerts,
         }
 
@@ -236,13 +253,17 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
         home_projected = round(pair["home_actual"] + week_team[home]["remaining_expected"], 1)
         away_projected = (round(pair["away_actual"] + week_team[away]["remaining_expected"], 1)
                           if away is not None else None)
+        incomplete = (week_team[home]["live_estimate_incomplete"]
+                      or (away is not None and week_team[away]["live_estimate_incomplete"]))
         output_matchups.append({
-            **pair, "home_projected": home_projected, "away_projected": away_projected,
-            "home_optimized_projected": round(
+            **pair,
+            "home_projected": None if incomplete else home_projected,
+            "away_projected": None if incomplete else away_projected,
+            "projection_incomplete": bool(incomplete),
+            "home_optimized_projected": None if incomplete else round(
                 pair["home_actual"] + week_team[home]["remaining_optimized"], 1),
-            "away_optimized_projected": round(
-                pair["away_actual"] + week_team[away]["remaining_optimized"], 1)
-            if away is not None else None,
+            "away_optimized_projected": (None if incomplete or away is None else round(
+                pair["away_actual"] + week_team[away]["remaining_optimized"], 1)),
         })
 
     free_agents = [normalize_entry(a) for a in snapshot["free_agents"]]
@@ -268,6 +289,13 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
         "teams": list(teams.values()),
         "matchups": output_matchups,
         "team_analysis": week_team,
+        "live_scoring": {
+            "source": "ESPN totalPointsLive, falling back to totalPoints",
+            "in_progress_nba_games": sum(
+                states.count("in") for states in nba_schedule[live_today].values()) // 2,
+            "method": "regulation minutes remaining times season projected FP/G",
+            "clock_data_unavailable": bool(live_error),
+        },
         "daily_lineups": daily,
         "nba_schedule": {d: {str(k): v for k, v in team_games.items()}
                          for d, team_games in nba_schedule.items()},
@@ -280,7 +308,7 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
             "streaming_requires_manual_review": True,
             "season_projection_baseline": "ESPN full-season projected FP/G",
             "historical_expected_baseline": "Current ESPN projection only; historical as-of snapshots not collected yet",
-            "today_in_progress_games": "Live games excluded from remaining projections",
+            "today_in_progress_games": "Live matchup totals credited; unfinished regulation minutes estimated, provisional",
             "free_agents_checked": len(free_agents),
         },
     }
