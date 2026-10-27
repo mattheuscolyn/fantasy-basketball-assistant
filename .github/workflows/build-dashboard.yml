@@ -41,6 +41,8 @@ jobs:
       - name: Test scoring and optimizer
         run: python -m unittest discover -s tests -v
       - name: Build read-only dashboard data
+        env:
+          COURTSIDE_HISTORY_DIR: projection-archive/snapshots
         run: python -m scripts.build_site
       - name: Check published JSON for prohibited fields
         run: |
