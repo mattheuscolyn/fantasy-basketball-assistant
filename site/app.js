@@ -139,7 +139,11 @@ function renderMoves(){
     const box=panel("+"+fmt(m.projected_gain)+" projected FP","One hypothetical acquisition");
     const x=el("div","versus");
     add(x,info(el("div"),"DROP",m.drop),el("span","accent","→"),info(el("div"),"ADD",m.add));
-    add(box,x,el("p","hint",m.note),pill(m.risk,true));layout.append(box);
+    add(box,x,
+      pill(m.availability_status==="WAIVERS"?"On waivers — claim not guaranteed":"Free agent"),
+      el("p","hint","Conservative first usable day: "+(m.first_usable_day||"unverified")),
+      el("p","hint",m.note),pill(m.risk,true));
+    layout.append(box);
   });
   section.append(layout);
 }
