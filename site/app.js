@@ -143,30 +143,34 @@ function renderTrends(){
     const p=DATA.players[id];
     if(!p||!Array.isArray(games)||games.length===0)return null;
     const actual=games.reduce((n,g)=>n+g.actual,0)/games.length;
-    return {...p,id,games,actual,delta:proj(p)!==null?actual-proj(p):null};
+    const matched=games.filter(g=>typeof g.expected_at_game==="number");
+    const priorActual=matched.length?matched.reduce((n,g)=>n+g.actual,0)/matched.length:null;
+    const priorExpected=matched.length?matched.reduce((n,g)=>n+g.expected_at_game,0)/matched.length:null;
+    return {...p,id,games,actual,matchedCount:matched.length,priorExpected,
+      delta:matched.length?priorActual-priorExpected:null};
   }).filter(Boolean).sort((a,b)=>(b.delta??-999)-(a.delta??-999));
-  section.append(heading("Performance trends","Actual game results vs today's ESPN projected FP/G"));
-  section.append(el("div","help","The projection line uses ESPN's CURRENT season-long estimate, not the projection that existed before each historical game. Players need multiple games to establish a meaningful pattern. A future update will save historical projection snapshots."));
+  section.append(heading("Performance trends","Actual game points vs. the ESPN projections saved before tipoff"));
+  section.append(el("div","help","Pre-game expectations are saved on each successful refresh. Games before tracking began have no historical expectation; they are NOT compared against today's projection. Three or more matched games are required for the ranking."));
   if(!players.length){section.append(el("div","empty","No game-by-game history returned from ESPN yet. The trend view will populate as validated game results become available."));return;}
   const controls=el("div","controls");
   add(controls,el("label","","Select player"),playerSelect(players));section.append(controls);
   const chosen=players.find(p=>String(p.id)===chartPlayer)||players[0];
   const top=el("div","stat-cards");
-  add(top,numberText("Actual FP/G",chosen.actual),numberText("ESPN projected",proj(chosen)),numberText("Difference",chosen.delta));
+  add(top,numberText("Actual FP/G",chosen.actual),numberText("Pregame expectation",chosen.priorExpected),numberText("Matched-game difference",chosen.delta));
   section.append(top);
   const chartBox=panel(chosen.name,"Game-by-game production · "+chosen.games.length+" observed games");
-  chartBox.append(makeGraph(chosen.games,proj(chosen)));
+  chartBox.append(makeGraph(chosen.games));
   const legend=el("div","legend");
-  [["#7cd8c7","Actual FP"],["#f0bd75","Current projection"],["#9e96ed","3-game average"]].forEach(([color,label])=>{
+  [["#7cd8c7","Actual FP"],["#f0bd75","As-of-game ESPN projection"],["#9e96ed","3-game average"]].forEach(([color,label])=>{
     const x=el("div","row");const dot=el("span","dot");dot.style.background=color;add(x,dot,el("span","",label));legend.append(x);
   });
   chartBox.append(legend);section.append(chartBox);
-  const ranking=panel("Largest projection gaps","Minimum 3 recorded games");
+  const ranking=panel("Largest projection gaps","Minimum 3 games with saved pre-tipoff projections");
   const table=el("table");
   const h=el("tr");["Player","Games","Actual","Expected","Δ / game"].forEach(x=>h.append(el("th","",x)));table.append(h);
-  [...players].filter(p=>p.games.length>=3&&p.delta!==null).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta)).slice(0,25).forEach(p=>{
+  [...players].filter(p=>p.matchedCount>=3&&p.delta!==null).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta)).slice(0,25).forEach(p=>{
     const row=el("tr");
-    [p.name,p.games.length,fmt(p.actual),fmt(proj(p)),fmt(p.delta)].forEach((val,i)=>{
+    [p.name,p.matchedCount,fmt(p.actual),fmt(p.priorExpected),fmt(p.delta)].forEach((val,i)=>{
       const c=el("td",i>0?"num":"",val);
       if(i===4)c.classList.add(p.delta>0?"good":"danger");
       row.append(c);
