@@ -1,5 +1,6 @@
 "use strict";
-let DATA=null, view="league", currentTeam="4", chartPlayer=null, daySelected=null;
+let DATA=null, view="strategy", currentTeam="4", chartPlayer=null, daySelected=null;
+let riskMode="conservative", protect={};
 const section=document.getElementById("content"), message=document.getElementById("message");
 const slots={0:"PG",1:"SG",2:"SF",3:"PF",4:"C",5:"G",6:"F",11:"UTIL",12:"BENCH",13:"IR"};
 const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined&&text!==null)e.textContent=String(text);return e;};
@@ -18,6 +19,7 @@ function nav(){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("
 function render(){
   nav();section.replaceChildren();
   if(!DATA){section.append(el("div","empty","No snapshot loaded yet. Run the site builder in GitHub Actions."));return;}
+  if(view==="strategy")renderStrategy();
   if(view==="league")renderLeague();
   if(view==="lineups")renderLineups();
   if(view==="trends")renderTrends();
