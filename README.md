@@ -7,7 +7,7 @@
 - **League:** Current head-to-head matchups, byes, actual points and a projected finish calculated using season-long ESPN fantasy points per game for remaining *unstarted* NBA games.
 - **Lineups:** Read the seven daily ESPN lineups for the matchup; detect eligible, higher-scoring lineup arrangements subject to the league's PG/SG/SF/PF/C/G/F and three UTIL slots.
 - **Opportunities:** Simulate one hypothetical add/drop against a limited pool of ESPN free agents and show the projected remaining-week difference. Moves are never executed.
-- **Trends:** Backfill recent actual game-by-game fantasy scores for rostered and available players from ESPN player cards; compare their 3-game rolling average with ESPN's *current* projected FP/G.
+- **Trends:** Backfill recent actual game-by-game fantasy scores for rostered and available players from historical day-scoped ESPN rosters; compare their 3-game rolling average with ESPN's *current* projected FP/G.
 
 This project is **not affiliated with ESPN**. The ESPN fantasy API is undocumented and can change. All calculations are advisory.
 
@@ -85,6 +85,6 @@ Core calculations have deterministic unit tests. Scheduled builds also validate 
 ## Next improvements
 
 - Confirm acquisition/game-play limit fields with ESPN and model waivers properly.
-- Widen free-agent coverage beyond the first 50 players.
+- Expand and paginate free-agent coverage beyond the initial 150-player ESPN request.
 - Preserve **point-in-time projection snapshots** for prospective trend analysis.
 - Add lineup-lock awareness, postgame forecast calibration and personalized protected-player preferences.
