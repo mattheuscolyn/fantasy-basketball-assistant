@@ -106,6 +106,19 @@ The **Streaming scenarios** panel simulates one- and two-acquisition sequences a
 
 **Limitations:** This is a candidate generator, not a complete game-theoretic optimizer. It does not predict waiver competition, trades, future injuries, shifts in playing time, probability of winning, or future free-agent availability. Streamers are assumed acquired in time to play beginning on the indicated following day. A move must be carried out manually in ESPN.
 
+## Evidence-first decision review (October 29)
+
+The Strategy tab now includes a **scenario comparison** that recomputes counterfactual lineups and displays:
+
+- A hold-roster baseline, projected final matchup margin, and remaining roster acquisition allowance (including pending claims).
+- Day-by-day counts of usable starters for Team TayTay and its current opponent.
+- Saved ESPN lineup versus optimized existing lineup versus simulated acquired-player lineup, with exact projected points gained by scoring day.
+- The exact suggested add/drop sequence, newly acquired starters who produce each day's gains, and estimated separate effects on the following two matchups.
+- Conditional conservative versus aggressive routes, protected-player controls, and explicit injury/availability/future-value uncertainty.
+- A prominent note when even the strongest allowed plan still projects a loss.
+
+The plan generator searches a bounded set of one- and two-roster-slot streams (up to four acquisitions in a combined sequence). It is **not an exhaustive proof** that all possible legal transactions have been considered. The dataset represents an ESPN point-in-time snapshot; a plan can cease to be available minutes later. The user must verify each transaction, roster lock, injury and pending claim directly in ESPN before acting. No transactions are made by Courtside. Longer-term permanent-loss risk cannot be reduced to the next two weeks' projection.
+
 ## Next improvements
 
 - Improve exact intra-day eligibility and player/game lock checks for newly processed waivers; compare prospective forecasts with outcomes.
