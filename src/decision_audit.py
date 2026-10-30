@@ -5,7 +5,7 @@ daily starters against the same optimized no-transaction baseline.
 """
 from datetime import date
 from itertools import combinations
-from src.weekly import best_lineup, current_lineup_score, point_value
+from src.weekly import best_lineup, current_lineup_score, point_value, ACTIVE_SLOTS, SLOT_NAMES
 
 
 def evaluate_sequence(moves, daily_rosters, nba_schedule, free_agents,
@@ -40,15 +40,28 @@ def evaluate_sequence(moves, daily_rosters, nba_schedule, free_agents,
         updated, updated_picks = best_lineup(simulated, games)
         ids = {str(p["id"]): p for p in simulated if p.get("id") is not None}
         starters = []
+        slot_counts = {}
         for item in updated_picks:
             p = ids.get(str(item["player_id"]))
-            if p:
-                starters.append({
-                    "player": p["name"],
-                    "id": p["id"],
-                    "projected_points": round(point_value(p, games), 1),
-                    "acquired": str(p["id"]) in active_added,
-                })
+            if not p:
+                raise ValueError("Scenario assigned a player not present on the roster.")
+            slot_id = item["slot_id"]
+            if slot_id not in ACTIVE_SLOTS or slot_id not in p.get("eligible_slots", []):
+                raise ValueError("Scenario assigned a player to an ineligible starting position.")
+            slot_counts[slot_id] = slot_counts.get(slot_id, 0) + 1
+            starters.append({
+                "player": p["name"],
+                "id": p["id"],
+                "assigned_slot": SLOT_NAMES[slot_id],
+                "eligible_slots": [SLOT_NAMES.get(s, str(s)) for s in p.get("eligible_slots", [])
+                                   if s in ACTIVE_SLOTS],
+                "projected_points": round(point_value(p, games), 1),
+                "acquired": str(p["id"]) in active_added,
+            })
+        if (len(starters) > 10 or len({str(p["id"]) for p in starters}) != len(starters)
+                or slot_counts.get(11, 0) > 3
+                or any(n > 1 for slot, n in slot_counts.items() if slot != 11)):
+            raise ValueError("Scenario assigned more players than the legal lineup capacity.")
         gained = round(updated - optimal, 1)
         total = {
             "date": day,
