@@ -113,6 +113,44 @@ def _convert_plan(plan, first_day):
     } for i, move in enumerate(plan["moves"])]
 
 
+def improve_first_drop_timing(moves, daily_rosters, nba_schedule, pool,
+                              current_roster=None, future_schedule=None):
+    """Preserve today's scheduled starter when a next-day add scores better.
+
+    Simulates both transaction timings under the same daily positional model.
+    Never delay an acquisition beyond the day its replacement is itself
+    supposed to be dropped. Still assumes next-day free-agent availability.
+    """
+    proposed = [dict(m) for m in sorted(moves, key=lambda m: m["day"])]
+    original = evaluate_sequence(proposed, daily_rosters, nba_schedule, pool,
+                                 current_roster, future_schedule)
+    days = sorted(daily_rosters)
+    if len(days) < 2:
+        return proposed, original
+    first, second = days[:2]
+    initial = {str(p.get("id")): p for p in daily_rosters[first]}
+    for index, move in enumerate(list(proposed)):
+        if move["day"] != first:
+            continue
+        dropped = initial.get(str(move["drop_id"]))
+        if not dropped or dropped.get("lineup_slot_id") not in ACTIVE_SLOTS:
+            continue
+        if point_value(dropped, nba_schedule[first]) <= 0:
+            continue
+        if any(str(other["drop_id"]) == str(move["add_id"])
+               and other["day"] <= second
+               for k, other in enumerate(proposed) if k != index):
+            continue
+        candidate = [dict(m) for m in proposed]
+        candidate[index]["day"] = second
+        candidate.sort(key=lambda m: (m["day"], str(m["drop_id"])))
+        alternative = evaluate_sequence(candidate, daily_rosters, nba_schedule,
+                                        pool, current_roster, future_schedule)
+        if alternative["gain_vs_optimized"] > original["gain_vs_optimized"] + 0.01:
+            proposed, original = candidate, alternative
+    return proposed, original
+
+
 def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
                        current_roster, future_schedule, opponent_projected,
                        user_projected, max_acquisitions=None):
@@ -123,9 +161,14 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
         moves = _convert_plan(plan, next(iter(daily_rosters)))
         if max_acquisitions is not None and len(moves) > max_acquisitions:
             continue
-        audit = evaluate_sequence(moves, daily_rosters, nba_schedule, pool,
-                                  current_roster, future_schedule)
+        moves, audit = improve_first_drop_timing(
+            moves, daily_rosters, nba_schedule, pool,
+            current_roster, future_schedule)
         item = dict(plan)
+        item["moves"] = [
+            {k: move[k] for k in ("day", "drop", "add", "add_id")}
+            for move in moves
+        ]
         item.update(audit)
         item["move_ids"] = moves
         item["scenario_final"] = round(user_projected + audit["free_lineup_gain"] + audit["gain_vs_optimized"], 1)
@@ -179,8 +222,9 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
         pair_key = tuple(sorted((str(a["drop_id"]), str(b["drop_id"]))))
         if per_drop_pair.get(pair_key, 0) >= 4:
             continue
-        audit = evaluate_sequence(moves, daily_rosters, nba_schedule, pool,
-                                  current_roster, future_schedule)
+        moves, audit = improve_first_drop_timing(
+            moves, daily_rosters, nba_schedule, pool,
+            current_roster, future_schedule)
         if audit["gain_vs_optimized"] <= max(
                 a["gain_vs_optimized"], b["gain_vs_optimized"])+1:
             continue
