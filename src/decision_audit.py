@@ -110,9 +110,6 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
         moves = _convert_plan(plan, next(iter(daily_rosters)))
         if max_acquisitions is not None and len(moves) > max_acquisitions:
             continue
-        pair_key = tuple(sorted((str(a["drop_id"]), str(b["drop_id"]))))
-        if per_drop_pair.get(pair_key, 0) >= 4:
-            continue
         audit = evaluate_sequence(moves, daily_rosters, nba_schedule, pool,
                                   current_roster, future_schedule)
         item = dict(plan)
@@ -165,6 +162,9 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
         moves = sorted(a["move_ids"] + b["move_ids"],
                        key=lambda m:(m["day"],str(m["drop_id"])))
         if max_acquisitions is not None and len(moves) > max_acquisitions:
+            continue
+        pair_key = tuple(sorted((str(a["drop_id"]), str(b["drop_id"]))))
+        if per_drop_pair.get(pair_key, 0) >= 4:
             continue
         audit = evaluate_sequence(moves, daily_rosters, nba_schedule, pool,
                                   current_roster, future_schedule)
