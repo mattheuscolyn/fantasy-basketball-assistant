@@ -115,7 +115,7 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
         item = dict(plan)
         item.update(audit)
         item["move_ids"] = moves
-        item["scenario_final"] = round(user_projected + audit["gain_vs_optimized"], 1)
+        item["scenario_final"] = round(user_projected + audit["free_lineup_gain"] + audit["gain_vs_optimized"], 1)
         item["scenario_margin"] = round(item["scenario_final"]-opponent_projected, 1)
         item["closes_projected_gap"] = item["scenario_margin"] >= 0
         item["drop_ids"] = [plan["drop_id"]]
@@ -127,9 +127,9 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
     candidates = []
     for group in grouped.values():
         best_double = sorted((p for p in group if p["acquisitions"] == 2),
-                             key=lambda p:p["gain_vs_optimized"], reverse=True)[:2]
+                             key=lambda p:p["gain_vs_optimized"], reverse=True)[:1]
         best_single = sorted((p for p in group if p["acquisitions"] == 1),
-                             key=lambda p:p["gain_vs_optimized"], reverse=True)[:2]
+                             key=lambda p:p["gain_vs_optimized"], reverse=True)[:1]
         candidates.extend(best_double+best_single)
     combined = []
     for a, b in combinations(candidates, 2):
@@ -162,7 +162,7 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
         output["this_week_gain"] = audit["gain_vs_optimized"]
         output["three_week_net_points"] = round(
             audit["gain_vs_optimized"]+audit.get("next_two_weeks_delta",0),1)
-        output["scenario_final"] = round(user_projected+audit["gain_vs_optimized"],1)
+        output["scenario_final"] = round(user_projected + audit["free_lineup_gain"] + audit["gain_vs_optimized"], 1)
         output["scenario_margin"] = round(output["scenario_final"]-opponent_projected,1)
         output["closes_projected_gap"] = output["scenario_margin"]>=0
         combined.append(output)
@@ -176,4 +176,14 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
         by_roster_drop.setdefault(key, [])
         if len(by_roster_drop[key]) < 5:
             by_roster_drop[key].append(p)
-    return [p for group in by_roster_drop.values() for p in group]
+    result = [p for group in by_roster_drop.values() for p in group]
+    for p in result:
+        p["verified_availability"] = False
+        p["assumption"] = ("All suggested players must still be free agents and "
+                            "eligible before each game's roster lock. No ESPN "
+                            "transaction or future availability is guaranteed.")
+        p["future_uncertainty"] = (
+            "Future-week projection holds current NBA injury statuses fixed and "
+            "does not forecast a dropped player's recovery.")
+        p["scenario_type"] = "two-roster-spot" if len(p["drop_ids"]) == 2 else "one-roster-spot"
+    return sorted(result, key=lambda p:p["scenario_margin"], reverse=True)[:40]
