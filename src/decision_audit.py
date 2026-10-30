@@ -177,7 +177,26 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
         if len(by_roster_drop[key]) < 5:
             by_roster_drop[key].append(p)
     result = [p for group in by_roster_drop.values() for p in group]
+    availability = {str(p["id"]): p for p in pool}
     for p in result:
+        statuses = []
+        for move in p["move_ids"]:
+            player = availability.get(str(move["add_id"]), {})
+            statuses.append({
+                "player_id": move["add_id"],
+                "name": player.get("name") or move.get("add"),
+                "availability": player.get("availability_status"),
+                "injury": player.get("injury_status"),
+            })
+        p["acquired_player_statuses"] = statuses
+        p["acquisition_risk"] = any(
+            s["availability"] != "FREEAGENT"
+            or s["injury"] not in ("ACTIVE", None)
+            for s in statuses)
+        if p["acquisition_risk"]:
+            p["next_two_weeks_delta"] = None
+            p["future_week_deltas"] = None
+            p["three_week_net_points"] = None
         p["verified_availability"] = False
         p["assumption"] = ("All suggested players must still be free agents and "
                             "eligible before each game's roster lock. No ESPN "
