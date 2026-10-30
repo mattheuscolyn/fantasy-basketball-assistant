@@ -7,6 +7,7 @@ from src.transactions import transaction_counts
 from src.outlook import (matchups_for_period, forecast_future_week,
                          generate_outlook, evaluate_season_signal, matchup_for_team)
 from src.streaming import streaming_options
+from src.decision_audit import evidence_for_plans
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -352,6 +353,23 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
         future_schedule=future_schedule if outlook else None,
         current_roster=current_original_roster,
         acquisition_remaining=remaining_moves)
+    # Audit candidate sequences against the same saved/optimized baseline.
+    # Transaction availability may change between snapshots and ESPN.
+    audited_plans = []
+    pair = next((m for m in output_matchups
+                 if MY_TEAM_ID in (m["home_team_id"], m["away_team_id"])), None)
+    if pair and planned_streams and (
+            isinstance(pair.get("home_projected"), (int, float)) and
+            isinstance(pair.get("away_projected"), (int, float))):
+        home = pair["home_team_id"] == MY_TEAM_ID
+        mine = pair["home_projected"] if home else pair["away_projected"]
+        opponent = pair["away_projected"] if home else pair["home_projected"]
+        audited_plans = evidence_for_plans(
+            planned_streams, {day: roster for day, roster in next_days.items()
+                             if day > today.isoformat()},
+            nba_schedule, free_agents, current_original_roster,
+            future_schedule if outlook else None, opponent, mine,
+            max_acquisitions=remaining_moves)
     # Include current-week ESPN histories where ESPN explicitly returns daily actuals.
     history = _history(SEASON_DAY_ONE, today, espn_fetch, player_info)
     archive = os.getenv("COURTSIDE_HISTORY_DIR")
@@ -407,6 +425,7 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
         "season_guidance": diagnostic,
         "performance_signals": performance_signals,
         "streaming_plans": planned_streams,
+        "audited_scenarios": audited_plans,
         "matchups": output_matchups,
         "team_analysis": week_team,
         "transaction_rules": rules,
