@@ -10,7 +10,7 @@ function renderAuditedScenarios(container) {
   const opponentProjected=pair?(myHome?pair.away_projected:pair.home_projected):null;
   const effective=list.filter(p=>(p.drop_ids||[p.drop_id]).every(id=>!protect[String(id)])
     &&(riskMode==="aggressive" ||
-       (typeof p.next_two_weeks_delta==="number" && p.next_two_weeks_delta>=0)));
+       (!p.acquisition_risk && typeof p.next_two_weeks_delta==="number" && p.next_two_weeks_delta>=0)));
   effective.sort((a,b)=>b.scenario_margin-a.scenario_margin);
   const best=effective[0]||null;
   const startMargin=Number.isFinite(myProjected)&&Number.isFinite(opponentProjected)
@@ -121,6 +121,13 @@ function renderAuditedScenarios(container) {
     details.append(summary);
     const rows=el("div","stack");
     rows.append(el("p","hint","Changes to execute in ESPN (these are NOT transactions already made):"));
+    if(plan.acquisition_risk){
+      rows.append(el("p","warning","High-uncertainty scenario: a suggested free agent has an injury/availability flag. Future-week benefits have been withheld."));
+    }
+    (plan.acquired_player_statuses||[]).forEach(player=>{
+      rows.append(el("p","hint",player.name+": "+(player.availability||"availability unconfirmed")+
+        " · ESPN injury status "+(player.injury||"unknown")));
+    });
     (plan.moves||[]).forEach((m,j)=>{
       rows.append(el("p","move-instruction",(j+1)+". "+dateLabel(m.day)+
          ": Drop "+m.drop+" → Add "+m.add));
