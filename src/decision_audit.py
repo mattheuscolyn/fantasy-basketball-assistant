@@ -110,6 +110,9 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
         moves = _convert_plan(plan, next(iter(daily_rosters)))
         if max_acquisitions is not None and len(moves) > max_acquisitions:
             continue
+        pair_key = tuple(sorted((str(a["drop_id"]), str(b["drop_id"]))))
+        if per_drop_pair.get(pair_key, 0) >= 4:
+            continue
         audit = evaluate_sequence(moves, daily_rosters, nba_schedule, pool,
                                   current_roster, future_schedule)
         item = dict(plan)
@@ -143,7 +146,12 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
                              key=lambda p:p["gain_vs_optimized"], reverse=True)[:1]
         candidates.extend(diverse+best_single)
     combined = []
-    for a, b in combinations(candidates, 2):
+    per_drop_pair = {}
+    # Evaluate the strongest independent routes first, with bounded runtime.
+    pairs = sorted(combinations(candidates, 2),
+                   key=lambda pair: (pair[0]["gain_vs_optimized"] +
+                                     pair[1]["gain_vs_optimized"]), reverse=True)
+    for a, b in pairs:
         if a["drop_id"] == b["drop_id"]:
             continue
         occupied = {str(m["add_id"]) for m in a["move_ids"]}
@@ -177,6 +185,9 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
         output["scenario_margin"] = round(output["scenario_final"]-opponent_projected,1)
         output["closes_projected_gap"] = output["scenario_margin"]>=0
         combined.append(output)
+        per_drop_pair[pair_key] = per_drop_pair.get(pair_key, 0) + 1
+        if len(combined) >= 45:
+            break
     # Diverse drop sets, avoid 20 near-identical recommendations.
     by_roster_drop = {}
     for p in sorted(enriched+combined,
