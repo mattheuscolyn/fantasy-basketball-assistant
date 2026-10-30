@@ -114,6 +114,10 @@ function renderStrategy(){
     add(label,check,desc);choices.append(label);
   });
   prefs.append(choices);section.append(prefs);
+  if(Array.isArray(DATA.audited_scenarios)) {
+    renderAuditedScenarios(section);
+    return;
+  }
   const plans=panel("Streaming scenarios","No roster changes made automatically");
   const actions=el("div","controls");
   const conservative=el("button","link-btn","Conservative");
