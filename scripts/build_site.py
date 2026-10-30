@@ -6,7 +6,7 @@ from src.transaction_rules import transaction_settings
 from src.transactions import transaction_counts
 from src.outlook import (matchups_for_period, forecast_future_week,
                          generate_outlook, evaluate_season_signal, matchup_for_team)
-from src.streaming import streaming_options
+from src.streaming import streaming_options, eligible_stream_days
 from src.decision_audit import evidence_for_plans
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -365,8 +365,8 @@ def build_data(today=None, *, nba_fetch=nba_day, espn_fetch=fetch,
         mine = pair["home_projected"] if home else pair["away_projected"]
         opponent = pair["away_projected"] if home else pair["home_projected"]
         audited_plans = evidence_for_plans(
-            planned_streams, {day: roster for day, roster in next_days.items()
-                             if day > today.isoformat()},
+            planned_streams, {day: next_days[day] for day in
+                             eligible_stream_days(next_days, nba_schedule, today)},
             nba_schedule, free_agents, current_original_roster,
             future_schedule if outlook else None, opponent, mine,
             max_acquisitions=remaining_moves)
