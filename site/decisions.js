@@ -35,6 +35,32 @@ function renderAuditedScenarios(container) {
     p.append(el("p","hint","Data freshness warning: this ESPN snapshot is more than six hours old. Availability, injuries and scores may have changed. Check the next refresh before making a transaction."));
   }
   container.append(p);
+  const myId=String(DATA.my_team_id);
+  const oppId=pair?String(myHome?pair.away_team_id:pair.home_team_id):null;
+  if(oppId&&DATA.daily_lineups){
+    const sched=panel("Where the remaining points can come from",
+                      "ESPN saved starters with upcoming NBA games");
+    const wrap=el("div","table-wrap"),table=el("table"),head=el("tr");
+    ["Date","Your starters with games","Opponent starters with games","Unfilled starting slots"].forEach(s=>head.append(el("th","",s)));
+    table.append(head);
+    Object.keys(DATA.daily_lineups).sort().forEach(day=>{
+      const games=DATA.nba_schedule?.[day]||{};
+      function countActive(tid){
+        const rows=DATA.daily_lineups[day]?.[tid]||[];
+        return rows.filter(p=>!([12,13].includes(p.lineup_slot_id))&&
+          (games[String(p.pro_team_id)]||[]).includes("pre")&&
+          !["OUT","SUSPENSION","INJURY_RESERVE","INJURED_RESERVE"].includes(p.injury_status)).length;
+      }
+      const ours=countActive(myId),theirs=countActive(oppId);
+      const tr=el("tr");
+      [dateLabel(day),String(ours)+"/10",String(theirs)+"/10",String(Math.max(0,10-ours))]
+        .forEach((s,i)=>tr.append(el("td",i>0?"num":"",s)));
+      table.append(tr);
+    });
+    wrap.append(table);sched.append(wrap);
+    sched.append(el("p","hint","An unfilled slot matters only if an eligible new player has an unstarted game that day. Full days often provide zero extra points. Live or completed games are intentionally excluded."));
+    container.append(sched);
+  }
   const evidence=panel("Choose your risk tolerance","Make the tradeoffs visible");
   const controls=el("div","controls");
   for(const [mode,label] of [["conservative","Conservative"],["aggressive","Show risky alternatives"]]){
