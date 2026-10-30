@@ -34,6 +34,17 @@ function renderAuditedScenarios(container) {
   if(Number.isFinite(sourceTime) && (now-sourceTime)>6*3600000) {
     p.append(el("p","hint","Data freshness warning: this ESPN snapshot is more than six hours old. Availability, injuries and scores may have changed. Check the next refresh before making a transaction."));
   }
+  const policy=DATA.transaction_rules||{};
+  const teamKey=String(DATA.my_team_id);
+  if(policy.usage_verified){
+    const remaining=policy.remaining_by_team?.[teamKey];
+    const pending=policy.pending_claims_by_team?.[teamKey]||0;
+    p.append(el("p","hint","ESPN acquisition allowance: "+remaining+
+      " remaining of "+policy.maximum_matchup_additions+
+      " this matchup; "+pending+" pending claim(s). Pending claims may reduce the number of additional moves you can make."));
+  }else{
+    p.append(el("p","hint","ESPN acquisition usage could not be verified. Check your remaining matchup adds and pending claims before executing a multi-move plan."));
+  }
   container.append(p);
   const myId=String(DATA.my_team_id);
   const oppId=pair?String(myHome?pair.away_team_id:pair.home_team_id):null;
