@@ -126,11 +126,22 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
         grouped.setdefault(str(plan["drop_id"]), []).append(plan)
     candidates = []
     for group in grouped.values():
-        best_double = sorted((p for p in group if p["acquisitions"] == 2),
-                             key=lambda p:p["gain_vs_optimized"], reverse=True)[:1]
+        doubles = sorted((p for p in group if p["acquisitions"] == 2),
+                         key=lambda p:p["gain_vs_optimized"], reverse=True)
+        # Search genuinely different streamers for two independent spots.
+        diverse = []
+        seen_first = set()
+        for plan in doubles:
+            first_id = str(plan["moves"][0]["add_id"])
+            if first_id in seen_first:
+                continue
+            seen_first.add(first_id)
+            diverse.append(plan)
+            if len(diverse) >= 3:
+                break
         best_single = sorted((p for p in group if p["acquisitions"] == 1),
                              key=lambda p:p["gain_vs_optimized"], reverse=True)[:1]
-        candidates.extend(best_double+best_single)
+        candidates.extend(diverse+best_single)
     combined = []
     for a, b in combinations(candidates, 2):
         if a["drop_id"] == b["drop_id"]:
@@ -205,4 +216,26 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
             "Future-week projection holds current NBA injury statuses fixed and "
             "does not forecast a dropped player's recovery.")
         p["scenario_type"] = "two-roster-spot" if len(p["drop_ids"]) == 2 else "one-roster-spot"
-    return sorted(result, key=lambda p:p["scenario_margin"], reverse=True)[:40]
+    ranked = sorted(result, key=lambda p:p["scenario_margin"], reverse=True)
+    diverse = []
+    chosen = set()
+    # Reserve representation of all original-drop combinations, even when
+    # many nearly identical candidates crowd out safer one-slot alternatives.
+    groups = {}
+    for plan in ranked:
+        key = tuple(sorted(str(x) for x in plan["drop_ids"]))
+        groups.setdefault(key, []).append(plan)
+    for group in groups.values():
+        for item in group[:2]:
+            ident = id(item)
+            if ident not in chosen:
+                chosen.add(ident)
+                diverse.append(item)
+    for item in ranked:
+        if len(diverse) >= 65:
+            break
+        ident = id(item)
+        if ident not in chosen:
+            chosen.add(ident)
+            diverse.append(item)
+    return sorted(diverse, key=lambda p:p["scenario_margin"], reverse=True)
