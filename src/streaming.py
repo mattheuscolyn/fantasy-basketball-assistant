@@ -3,16 +3,36 @@ from datetime import date, timedelta
 from src.weekly import best_lineup, INACTIVE_STATUSES, INJURED_RESERVE
 
 
+def eligible_stream_days(daily_lineups, nba_schedule, today):
+    """Count the current NBA scoring day only before its first game starts.
+
+    Same-day adds are merely a scenario: ESPN must confirm transaction and
+    roster lock before tipoff. Once any NBA game starts, use the next day.
+    """
+    result = []
+    for day in sorted(daily_lineups):
+        when = date.fromisoformat(day)
+        if when < today:
+            continue
+        if when == today:
+            if any(state != "pre" for states in nba_schedule.get(day, {}).values()
+                   for state in states):
+                continue
+        result.append(day)
+    return result
+
+
 def streaming_options(daily_lineups, nba_schedule, free_agents, today,
                       future_schedule=None, current_roster=None,
                       acquisition_remaining=None):
     """Enumerate at most two free-agent moves, never executing transactions.
 
-    Models the first acquisition as usable tomorrow. A second acquisition
+    Models a free-agent first acquisition as usable today only if no NBA games
+    have begun; otherwise tomorrow. A second acquisition
     replaces the first streamable free agent on a later day. Future roster
     loss is estimated separately across the next two matchup weeks.
     """
-    days = [d for d in sorted(daily_lineups) if date.fromisoformat(d) > today]
+    days = eligible_stream_days(daily_lineups, nba_schedule, today)
     if not days or acquisition_remaining == 0:
         return []
     roster = daily_lineups[days[0]]
