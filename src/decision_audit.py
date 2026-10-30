@@ -133,14 +133,18 @@ def evidence_for_plans(plans, daily_rosters, nba_schedule, agents,
                          key=lambda p:p["gain_vs_optimized"], reverse=True)
         # Search genuinely different streamers for two independent spots.
         diverse = []
-        seen_first = set()
+        by_first = {}
         for plan in doubles:
             first_id = str(plan["moves"][0]["add_id"])
-            if first_id in seen_first:
+            if first_id not in by_first and len(by_first) >= 4:
                 continue
-            seen_first.add(first_id)
+            selected = by_first.setdefault(first_id, set())
+            last_id = str(plan["moves"][-1]["add_id"])
+            if last_id in selected or len(selected) >= 2:
+                continue
+            selected.add(last_id)
             diverse.append(plan)
-            if len(diverse) >= 3:
+            if len(diverse) >= 8:
                 break
         best_single = sorted((p for p in group if p["acquisitions"] == 1),
                              key=lambda p:p["gain_vs_optimized"], reverse=True)[:1]
