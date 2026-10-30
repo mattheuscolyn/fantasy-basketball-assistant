@@ -152,7 +152,7 @@ function renderAuditedScenarios(container) {
       [dateLabel(day.date),fmt(day.saved_lineup_fp),
        fmt(day.optimized_no_move_fp),fmt(day.scenario_fp),
        (day.extra_fp>=0?"+":"")+fmt(day.extra_fp),
-       day.newly_acquired_starters?.map(p=>p.player+" ("+fmt(p.projected_points)+")").join(", ")||"None"]
+       day.newly_acquired_starters?.map(p=>p.player+" → "+(p.assigned_slot||"slot unknown")+" ("+fmt(p.projected_points)+" FP)").join(", ")||"None"]
        .forEach((txt,j)=>tr.append(el("td",j>0&&j<5?"num":"",txt)));
       dtable.append(tr);
     });
@@ -167,6 +167,7 @@ function renderAuditedScenarios(container) {
         dateLabel(week)+": "+(change>=0?"+":"")+fmt(change)+" FP").join(" · ");
       rows.append(el("p","hint","Estimated subsequent matchup impact: "+futureText));
     }
+    rows.append(el("p","hint","Every simulated starting player is assigned to one ESPN-eligible PG, SG, SF, PF, C, G, F, or UTIL slot (maximum three UTIL). The table labels the assigned slot for each acquired player. Existing locked starters are not displaced."));
     rows.append(el("p","hint","Audit: ESPN saved-lineup baseline → optimized existing lineup → acquired-player simulation. Gain is above the OPTIMIZED baseline, so free lineup improvements are not counted as streaming value."));
     rows.append(el("p","hint",
       "Constraints: "+(plan.acquisitions||0)+" hypothetical acquisitions; check current allowance. "+
