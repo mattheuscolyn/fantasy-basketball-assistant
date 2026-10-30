@@ -148,19 +148,21 @@ def streaming_options(daily_lineups, nba_schedule, free_agents, today,
         group = [p for p in options if p["drop_id"] == dropped["id"]]
         singles = [p for p in group if p["acquisitions"] == 1]
         selected = []
-        different_first = set()
-        different_last = set()
-        # Keep several distinct routes, not merely five near-identical
-        # permutations using the same Saturday/Sunday players.
+        per_first = {}
+        # For each of several distinct first streamers, keep two different
+        # final streamers. Otherwise both roster spots always compete for
+        # one Sunday pickup and no combined scenario can be evaluated.
         for plan in group:
             first = str(plan["moves"][0]["add_id"])
             last = str(plan["moves"][-1]["add_id"])
-            if first in different_first and last in different_last:
+            if first not in per_first and len(per_first) >= 5:
                 continue
+            endings = per_first.setdefault(first, set())
+            if last in endings or len(endings) >= 2:
+                continue
+            endings.add(last)
             selected.append(plan)
-            different_first.add(first)
-            different_last.add(last)
-            if len(selected) >= 9:
+            if len(selected) >= 12:
                 break
         if singles and not any(p["acquisitions"] == 1 for p in selected):
             selected.append(singles[0])
